@@ -1,26 +1,462 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
+/*
+ * RentFlow design tokens.
+ *
+ * The palette is ported verbatim from the Figma Make source (src/index.css) and
+ * mapped onto shadcn's semantic token names, so every shadcn/ui component picks
+ * up the RentFlow look without per-component overrides.
+ */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  /*
+   * A two-face pairing: Arial sets body, controls and tables — a system font,
+   * so nothing is downloaded for the bulk of the interface — while headings
+   * take Plus Jakarta Sans, whose 700–800 cuts give display type the weight
+   * Arial's two-cut family cannot reach.
+   */
+  --font-sans: Arial, Helvetica, sans-serif;
+  --font-display: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  /*
+   * Elevation. The flat `shadow-sm` everything shared read as sticker-on-page;
+   * a two-part shadow — a tight contact edge plus a wider ambient spread —
+   * is what gives a surface the sense of sitting above the canvas.
+   */
+  --shadow-card:
+    0 1px 2px -1px rgb(15 23 42 / 0.06), 0 4px 16px -4px rgb(15 23 42 / 0.08);
+  --shadow-card-hover:
+    0 2px 4px -1px rgb(15 23 42 / 0.08), 0 12px 28px -8px rgb(15 23 42 / 0.14);
+  --shadow-raised:
+    0 1px 2px -1px rgb(15 23 42 / 0.08), 0 20px 40px -12px rgb(15 23 42 / 0.18);
+
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  /* Radii ported from the Figma source rather than derived from --radius. */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  --background: #f1f5f9;
+  --foreground: #0f172a;
+
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+
+  --muted: #f8fafc;
+  --muted-foreground: #64748b;
+  --accent: #eff6ff;
+  --accent-foreground: #1d4ed8;
+  --destructive: #dc2626;
+
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #93c5fd;
+
+  --radius: 0.875rem;
+
+  /* Chart series, matching the Dashboard's Recharts palette. */
+  --chart-1: #2563eb;
+  --chart-2: #f59e0b;
+  --chart-3: #16a34a;
+  --chart-4: #dc2626;
+  --chart-5: #7c3aed;
+
+  /* The sidebar is the dark navy rail from the design. */
+  --sidebar: #0f172a;
+  --sidebar-foreground: #94a3b8;
+  --sidebar-primary: #2563eb;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgb(255 255 255 / 8%);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgb(255 255 255 / 10%);
+  --sidebar-ring: #93c5fd;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
+
+  body {
+    /*
+     * Light mode paints the canvas here. Dark mode leaves it transparent so the
+     * GradientWaves backdrop — which sits behind the document on a negative
+     * z-index — can show through; an opaque fill would cover it.
+     */
+    @apply bg-background text-foreground;
+    /*
+     * Regular, not medium. Arial has no 500 cut, so a medium baseline would
+     * either snap back to 400 or be synthesised into a smeared faux-weight.
+     * Pinning it keeps text crisp.
+     */
+    font-weight: 400;
+  }
+
+  /*
+   * Figures line up in columns. Without this, proportional digits make stat
+   * tiles and table money columns visibly ragged as values change.
+   */
+  th,
+  td,
+  [data-numeric] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /*
+   * The design's focus ring, restored from the Figma source. Scoped away from
+   * shadcn's slotted components, which carry their own ring — without the
+   * exclusion the two would stack. This covers the plain buttons and links the
+   * app builds directly: sidebar nav, filter pills, table row actions, tabs.
+   */
+  :focus-visible:not([data-slot]) {
+    outline: 2px solid #93c5fd;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background-color: #dbeafe;
+    color: #0f172a;
+  }
+
+  html {
+    @apply font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /*
+   * Headings tighten as they grow. Letter-spacing that suits 13px looks loose
+   * and amateurish at 24px+, so the larger the type the more it is pulled in —
+   * the single cheapest thing that makes a UI read as typeset rather than
+   * defaulted.
+   */
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display;
+    letter-spacing: -0.018em;
+  }
+
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/*
+ * Dark-glass theme for the app shell.
+ *
+ * Every screen was built in the light palette — white cards, slate-900 text,
+ * slate-50 tiles. Rather than rewrite several hundred class strings across
+ * eleven pages, this re-maps those utilities once inside `.dark`. The
+ * selector is one class more specific than the utility it overrides, so it wins
+ * without `!important`, and pages keep reading as light-theme source.
+ *
+ * Only `.bg-white` — the card surfaces — gets a backdrop blur. Inner tiles use
+ * flat translucency, because every additional blurred layer composites against
+ * the live WebGL backdrop and they stack up fast.
+ */
+.dark {
+  color: rgb(226 232 240 / 0.85);
+
+  /*
+   * Semantic tokens for anything portalled out of the page — dialogs, dropdown
+   * menus, selects, toasts. Those render under <body>, outside any page
+   * wrapper, so they can only be themed through these.
+   */
+  --background: #0f0a18;
+  --foreground: #f8fafc;
+  --card: rgb(255 255 255 / 0.11);
+  --card-foreground: #f8fafc;
+  --popover: #1b1430;
+  --popover-foreground: #f8fafc;
+  --secondary: rgb(255 255 255 / 0.08);
+  --secondary-foreground: #f8fafc;
+  --muted: rgb(255 255 255 / 0.07);
+  --muted-foreground: #b6c2d4;
+  --accent: rgb(255 255 255 / 0.1);
+  --accent-foreground: #f8fafc;
+  --border: rgb(255 255 255 / 0.12);
+  --input: rgb(255 255 255 / 0.16);
+}
+
+/* The body fill is the backdrop's job in dark mode, not the document's. */
+.dark body {
+  background-color: transparent;
+}
+
+/*
+ * Cards sit ABOVE the backdrop, so they are lighter than it.
+ *
+ * On a dark theme elevation reads as added light — a raised surface catches
+ * more of it. Tinting cards darker than the page made them read as holes
+ * punched through it. A white veil lifts whatever is behind, so the card
+ * tracks the backdrop's own colour as the shader moves rather than fighting it.
+ *
+ * The earlier attempt at this looked muddy for a different reason: the text
+ * ramp was built from alpha values, which compounded against the translucent
+ * surface. With the ramp opaque, a white veil works as intended.
+ */
+.dark .bg-white {
+  background-color: rgb(255 255 255 / 0.11);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+
+/* Surfaces layered inside a card: stat tiles, table headers, list rows. These
+   sit on an already-lifted surface, so they lift again — a second small step,
+   not a repeat of the card's own. */
+.dark :is(.bg-slate-50, .bg-muted) {
+  background-color: rgb(255 255 255 / 0.07);
+}
+
+.dark .bg-slate-100 {
+  background-color: rgb(255 255 255 / 0.11);
+}
+
+/* The `/70` variant is its own generated class, so it needs naming too. */
+.dark :is(
+    .border-slate-100,
+    .border-slate-200,
+    .border-slate-300,
+    .border-slate-200\/70
+  ) {
+  border-color: rgb(255 255 255 / 0.1);
+}
+
+.dark .divide-slate-100 > * + * {
+  border-color: rgb(255 255 255 / 0.08);
+}
+
+/*
+ * Text ramp, inverted. Kept fully opaque — layering alpha on top of a
+ * translucent surface compounds into the muddy low-contrast text that made the
+ * first pass unreadable. Each step is a real slate value instead.
+ */
+.dark .text-slate-900 {
+  color: #ffffff;
+}
+.dark .text-slate-800 {
+  color: #f1f5f9;
+}
+.dark .text-slate-700 {
+  color: #e2e8f0;
+}
+.dark .text-slate-600 {
+  color: #dbe3ec;
+}
+.dark .text-slate-500 {
+  color: #b6c2d4;
+}
+.dark .text-slate-400 {
+  color: #9aa7bb;
+}
+.dark .text-slate-300 {
+  color: #cbd5e1;
+}
+
+/* Accent tiles and status pills: the 50/100 tints vanish on a dark ground, so
+   they become translucent washes of their own hue instead. */
+.dark :is(.bg-blue-50, .bg-blue-100) {
+  background-color: rgb(59 130 246 / 0.16);
+}
+.dark :is(.bg-green-50, .bg-green-100) {
+  background-color: rgb(34 197 94 / 0.16);
+}
+.dark :is(.bg-amber-50, .bg-amber-100) {
+  background-color: rgb(245 158 11 / 0.16);
+}
+.dark :is(.bg-red-50, .bg-red-100) {
+  background-color: rgb(239 68 68 / 0.16);
+}
+.dark :is(.bg-violet-50, .bg-violet-100, .bg-purple-100) {
+  background-color: rgb(139 92 246 / 0.16);
+}
+.dark :is(.bg-emerald-50, .bg-emerald-100) {
+  background-color: rgb(16 185 129 / 0.16);
+}
+
+/* The 600/700 text tones inside those pills are too dark once the fill is
+   translucent — lift each to its 300 step. */
+.dark :is(.text-blue-600, .text-blue-700) {
+  color: #93c5fd;
+}
+.dark :is(.text-green-600, .text-green-700) {
+  color: #86efac;
+}
+.dark :is(.text-amber-600, .text-amber-700) {
+  color: #fcd34d;
+}
+.dark :is(.text-red-600, .text-red-700) {
+  color: #fca5a5;
+}
+.dark :is(.text-violet-600, .text-violet-700, .text-purple-600) {
+  color: #c4b5fd;
+}
+.dark :is(.text-emerald-600, .text-emerald-700) {
+  color: #6ee7b7;
+}
+
+/* Row and tile hovers read as a lift on dark, not a grey wash. */
+.dark .hover\:bg-slate-50:hover,
+.dark .hover\:bg-slate-100:hover {
+  background-color: rgb(255 255 255 / 0.07);
+}
+
+/* Inputs sit on the glass, so they need the same treatment as the auth form. */
+.dark input,
+.dark [data-slot="select-trigger"] {
+  background-color: rgb(255 255 255 / 0.06);
+  border-color: rgb(255 255 255 / 0.16);
+  color: #f8fafc;
+}
+
+.dark input::placeholder {
+  color: rgb(226 232 240 / 0.42);
+}
+
+/* Solid-fill actions stay solid — the primary button must not dissolve. */
+.dark :is(.bg-blue-600, .bg-green-600, .bg-red-500, .bg-blue-500) {
+  backdrop-filter: none;
+}
+
+/*
+ * Glass form card for the auth screens.
+ *
+ * The forms are built in the app's light palette — slate-900 headings,
+ * slate-700 labels, white inputs. Rather than fork each of the three pages into
+ * a dark variant, the card carries one class and re-tints its contents here.
+ * Descendant selectors are the right tool precisely because this is a
+ * theme-scoped context rather than a reusable component.
+ */
+.auth-glass {
+  background: rgb(255 255 255 / 0.07);
+  border: 1px solid rgb(255 255 255 / 0.14);
+  box-shadow:
+    0 1px 0 0 rgb(255 255 255 / 0.12) inset,
+    0 24px 60px -20px rgb(0 0 0 / 0.65);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+}
+
+.auth-glass :is(h1, h2, h3) {
+  color: #fff;
+}
+
+.auth-glass p {
+  color: rgb(226 232 240 / 0.66);
+}
+
+.auth-glass label {
+  color: rgb(241 245 249 / 0.88);
+}
+
+.auth-glass input {
+  background: rgb(255 255 255 / 0.06);
+  border-color: rgb(255 255 255 / 0.16);
+  color: #fff;
+}
+
+.auth-glass input::placeholder {
+  color: rgb(226 232 240 / 0.42);
+}
+
+.auth-glass input:focus-visible {
+  background: rgb(255 255 255 / 0.1);
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 2px rgb(147 197 253 / 0.55);
+}
+
+/* Browser autofill repaints its own opaque background and near-black text,
+   which would punch a white block through the glass. */
+.auth-glass input:-webkit-autofill,
+.auth-glass input:-webkit-autofill:hover,
+.auth-glass input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #fff;
+  caret-color: #fff;
+  box-shadow: 0 0 0 1000px rgb(30 22 51 / 0.92) inset;
+}
+
+/* Validation messages: red-600 reads almost brown against the dark card. */
+.auth-glass [role="alert"] {
+  color: #fca5a5;
+}
+
+/* Links sit on a dark field now, so the light-theme blue-600 is too dim. */
+.auth-glass a {
+  color: #93c5fd;
+}
+
+.auth-glass a:hover {
+  color: #bfdbfe;
+}
+
+/* Thin scrollbars that only reveal on hover, ported from the Figma source. */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 99px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+:hover::-webkit-scrollbar-thumb {
+  opacity: 1;
 }

@@ -1,16 +1,29 @@
+import { http } from "./http";
 import {
-  documents as seedDocuments,
-  notifications as seedNotifications,
-  ownerProfile as seedOwner,
-  properties as seedProperties,
-  rentBills as seedBills,
-  rentPayments as seedPayments,
-  tenants as seedTenants,
-} from "@/lib/mock-data";
+  fromRelation,
+  toBill,
+  toDocKind,
+  toDocument,
+  toIdKind,
+  toMethod,
+  toNotification,
+  toOwnerProfile,
+  toPayment,
+  toProperty,
+  toTenant,
+  toUnit,
+  type ApiBill,
+  type ApiDocument,
+  type ApiLease,
+  type ApiNotification,
+  type ApiOwner,
+  type ApiPayment,
+  type ApiProperty,
+  type ApiUnit,
+} from "./mappers";
 import type {
   AppNotification,
   DocumentType,
-  ElectricityMode,
   Floor,
   HouseholdMember,
   OwnerProfile,
@@ -23,49 +36,32 @@ import type {
 } from "@/types";
 
 /**
- * The mock API.
+ * The API client.
  *
- * Every screen reads and writes through this module — never through the seed
- * data directly. Each function is shaped like the HTTP call that will replace
- * it, so swapping in NestJS means rewriting these bodies and nothing else.
+ * Every screen reads and writes through this module and nothing else, which is
+ * what made replacing the in-memory mock a change to this one file. The
+ * signatures are unchanged; only the bodies moved from arrays to HTTP.
  *
- * State lives in module-level arrays, so it survives client-side navigation but
- * resets on a full reload. That is deliberate: it keeps the mock honest about
- * being a mock.
+ * Shapes are translated in ./mappers: the API splits a tenancy into a person,
+ * a lease and its occupants, and the screens still want the flat tenant card
+ * they were designed around.
  */
 
-const LATENCY_MS = 120;
-
-function delay<T>(value: T): Promise<T> {
-  return new Promise((resolve) => setTimeout(() => resolve(value), LATENCY_MS));
-}
-
-function clone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
-}
-
-let properties: Property[] = clone(seedProperties);
-let tenants: Tenant[] = clone(seedTenants);
-let bills: RentBill[] = clone(seedBills);
-let payments: RentPayment[] = clone(seedPayments);
-let documents: PropertyDocument[] = clone(seedDocuments);
-let notifications: AppNotification[] = clone(seedNotifications);
-let owner: OwnerProfile = clone(seedOwner);
-
-/** Monotonic id generator, standing in for the database's id assignment. */
-let idCounter = 1000;
-const nextId = (prefix: string) => `${prefix}${++idCounter}`;
+const get = async <T>(url: string, params?: object): Promise<T> =>
+  (await http.get<T>(url, { params })).data;
 
 /* ------------------------------------------------------------------ */
 /* Properties                                                          */
 /* ------------------------------------------------------------------ */
 
-export function listProperties(): Promise<Property[]> {
-  return delay(clone(properties));
+export async function listProperties(): Promise<Property[]> {
+  const data = await get<ApiProperty[]>("/properties");
+  return data.map(toProperty);
 }
 
-export function getProperty(id: string): Promise<Property | null> {
-  return delay(clone(properties.find((p) => p.id === id) ?? null));
+export async function getProperty(id: string): Promise<Property | null> {
+  const data = await get<ApiProperty>(`/properties/${id}`);
+  return data ? toProperty(data) : null;
 }
 
 export interface NewPropertyInput {
@@ -75,16 +71,14 @@ export interface NewPropertyInput {
   type: string;
 }
 
-export function createProperty(input: NewPropertyInput): Promise<Property> {
-  const property: Property = {
-    id: nextId("p"),
-    ...input,
-    image:
-      "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&h=500&fit=crop&auto=format",
-    floors: [],
-  };
-  properties = [...properties, property];
-  return delay(clone(property));
+export async function createProperty(input: NewPropertyInput): Promise<Property> {
+  const { data } = await http.post<ApiProperty>("/properties", {
+    name: input.name,
+    locality: input.location,
+    address: input.address,
+    kind: input.type.toLowerCase(),
+  });
+  return toProperty(data);
 }
 
 export interface NewFloorInput {
@@ -93,24 +87,12 @@ export interface NewFloorInput {
   number: number;
 }
 
-export function createFloor(input: NewFloorInput): Promise<Floor> {
-  const floor: Floor = {
-    id: nextId("f"),
-    propertyId: input.propertyId,
-    number: input.number,
-    name: input.name,
-    units: [],
-  };
-
-  properties = properties.map((p) =>
-    p.id === input.propertyId
-      ? // Kept ordered by floor number so the detail page, which renders them
-        // in reverse, always shows the top floor first.
-        { ...p, floors: [...p.floors, floor].sort((a, b) => a.number - b.number) }
-      : p,
+export async function createFloor(input: NewFloorInput): Promise<Floor> {
+  const { data } = await http.post<{ id: string; propertyId: string; level: number; name: string }>(
+    `/properties/${input.propertyId}/floors`,
+    { level: input.number, name: input.name },
   );
-
-  return delay(clone(floor));
+  return { id: data.id, propertyId: data.propertyId, number: data.level, name: data.name, units: [] };
 }
 
 export interface NewUnitInput {
@@ -121,119 +103,103 @@ export interface NewUnitInput {
   deposit: number;
 }
 
-export function createUnit(input: NewUnitInput): Promise<Unit> {
-  const unit: Unit = {
-    id: nextId("u"),
+export async function createUnit(input: NewUnitInput): Promise<Unit> {
+  const { data } = await http.post<ApiUnit>(`/properties/${input.propertyId}/units`, {
     floorId: input.floorId,
-    propertyId: input.propertyId,
     number: input.number,
-    rent: input.rent,
-    deposit: input.deposit,
-    // A new unit has nobody in it; assigning a tenant is what occupies it.
-    status: "vacant",
-  };
-
-  properties = properties.map((p) =>
-    p.id === input.propertyId
-      ? {
-          ...p,
-          floors: p.floors.map((f) =>
-            f.id === input.floorId ? { ...f, units: [...f.units, unit] } : f,
-          ),
-        }
-      : p,
-  );
-
-  return delay(clone(unit));
+    defaultRent: input.rent.toFixed(2),
+    defaultDeposit: input.deposit.toFixed(2),
+  });
+  return toUnit(data);
 }
 
-/** Flattens the property → floor → unit tree, which most screens want. */
-export function listUnits(): Promise<Unit[]> {
-  const units = properties.flatMap((p) => p.floors.flatMap((f) => f.units));
-  return delay(clone(units));
+export async function listUnits(): Promise<Unit[]> {
+  const data = await get<ApiUnit[]>("/units");
+  return data.map(toUnit);
 }
 
-export function getUnit(id: string): Promise<Unit | null> {
-  const unit = properties
-    .flatMap((p) => p.floors.flatMap((f) => f.units))
-    .find((u) => u.id === id);
-  return delay(clone(unit ?? null));
+export async function getUnit(id: string): Promise<Unit | null> {
+  const data = await get<ApiUnit>(`/units/${id}`);
+  return data ? toUnit(data) : null;
 }
 
 /* ------------------------------------------------------------------ */
-/* Tenants                                                             */
+/* Tenancies                                                           */
 /* ------------------------------------------------------------------ */
 
-export function listTenants(): Promise<Tenant[]> {
-  return delay(clone(tenants));
+export async function listTenants(): Promise<Tenant[]> {
+  const data = await get<ApiLease[]>("/leases");
+  return data.map(toTenant);
 }
 
-export function getTenant(id: string): Promise<Tenant | null> {
-  return delay(clone(tenants.find((t) => t.id === id) ?? null));
+export async function getTenant(id: string): Promise<Tenant | null> {
+  const data = await get<ApiLease>(`/leases/${id}`);
+  return data ? toTenant(data) : null;
 }
 
-/** A member as the form supplies it — the id is the server's to assign. */
 export type NewMemberInput = Omit<HouseholdMember, "id">;
 
 export type NewTenantInput = Omit<Tenant, "id" | "photo" | "members"> &
   Partial<Pick<Tenant, "photo">> & { members?: NewMemberInput[] };
 
-export function createTenant(input: NewTenantInput): Promise<Tenant> {
-  const tenant: Tenant = {
-    ...input,
-    id: nextId("t"),
-    photo:
-      input.photo ??
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&auto=format",
-    // Members arrive without ids, the same way they will from the API client.
-    members: (input.members ?? []).map((m) => ({ ...m, id: nextId("m") })),
+/** A member, in the shape the leases endpoint takes. */
+function memberPayload(member: NewMemberInput) {
+  return {
+    person: {
+      fullName: member.name,
+      phone: member.phone || undefined,
+      occupation: member.occupation || undefined,
+      // The API stores a date of birth; the form collects an age. An age with
+      // no birthday is only good to the year, which is what this reflects.
+      dateOfBirth:
+        member.age === undefined
+          ? undefined
+          : `${new Date().getFullYear() - member.age}-01-01`,
+      idKind: member.idType ? toIdKind(member.idType) : undefined,
+      idNumber: member.idNumber || undefined,
+    },
+    relation: fromRelation(member.relation),
+    relationNote: member.relationNote || undefined,
   };
-  tenants = [...tenants, tenant];
-
-  // Occupying a unit is part of the same transaction on the backend.
-  properties = properties.map((p) => ({
-    ...p,
-    floors: p.floors.map((f) => ({
-      ...f,
-      units: f.units.map((u) =>
-        u.id === tenant.unitId
-          ? { ...u, status: "occupied" as const, tenantId: tenant.id }
-          : u,
-      ),
-    })),
-  }));
-
-  return delay(clone(tenant));
 }
 
-/* ------------------------------------------------------------------ */
-/* Household members                                                   */
-/* ------------------------------------------------------------------ */
-
-/** Replaces one tenant's member list, returning the updated tenant. */
-function withMembers(
-  tenantId: string,
-  update: (members: HouseholdMember[]) => HouseholdMember[],
-): Tenant {
-  const current = tenants.find((t) => t.id === tenantId);
-  if (!current) throw new Error(`Unknown tenant: ${tenantId}`);
-
-  const next: Tenant = { ...current, members: update(current.members) };
-  tenants = tenants.map((t) => (t.id === tenantId ? next : t));
-  return next;
+export async function createTenant(input: NewTenantInput): Promise<Tenant> {
+  const { data } = await http.post<ApiLease>("/leases", {
+    unitId: input.unitId,
+    primaryPerson: {
+      fullName: input.name,
+      phone: input.phone,
+      email: input.email,
+      occupation: input.occupation,
+      addressLine: input.address,
+      city: input.city,
+      state: input.state,
+      pincode: input.pincode,
+      idKind: toIdKind(input.idType),
+      idNumber: input.idNumber,
+    },
+    termStart: input.leaseStart,
+    termEnd: input.leaseEnd || undefined,
+    rent: input.rentAmount.toFixed(2),
+    deposit: input.deposit.toFixed(2),
+    emergencyName: input.emergencyContact || undefined,
+    emergencyPhone: input.emergencyPhone || undefined,
+    members: (input.members ?? []).map(memberPayload),
+  });
+  return toTenant(data);
 }
 
 export interface AddMemberInput extends NewMemberInput {
   tenantId: string;
 }
 
-export function addHouseholdMember(input: AddMemberInput): Promise<Tenant> {
+export async function addHouseholdMember(input: AddMemberInput): Promise<Tenant> {
   const { tenantId, ...member } = input;
-  const next = withMembers(tenantId, (members) => [
-    ...members,
-    { ...member, id: nextId("m") },
-  ]);
-  return delay(clone(next));
+  const { data } = await http.post<ApiLease>(
+    `/leases/${tenantId}/occupants`,
+    memberPayload(member),
+  );
+  return toTenant(data);
 }
 
 export interface UpdateMemberInput extends Partial<NewMemberInput> {
@@ -241,101 +207,122 @@ export interface UpdateMemberInput extends Partial<NewMemberInput> {
   memberId: string;
 }
 
-export function updateHouseholdMember(
-  input: UpdateMemberInput,
-): Promise<Tenant> {
+export async function updateHouseholdMember(input: UpdateMemberInput): Promise<Tenant> {
   const { tenantId, memberId, ...patch } = input;
-  const next = withMembers(tenantId, (members) =>
-    members.map((m) => (m.id === memberId ? { ...m, ...patch } : m)),
+  const { data } = await http.patch<ApiLease>(
+    `/leases/${tenantId}/occupants/${memberId}`,
+    {
+      relation: patch.relation ? fromRelation(patch.relation) : undefined,
+      relationNote: patch.relationNote || undefined,
+    },
   );
-  return delay(clone(next));
+  return toTenant(data);
 }
 
-export function removeHouseholdMember(input: {
+export async function removeHouseholdMember(input: {
   tenantId: string;
   memberId: string;
 }): Promise<Tenant> {
-  const next = withMembers(input.tenantId, (members) =>
-    members.filter((m) => m.id !== input.memberId),
+  const { data } = await http.delete<ApiLease>(
+    `/leases/${input.tenantId}/occupants/${input.memberId}`,
   );
-  return delay(clone(next));
+  return toTenant(data);
 }
 
-/**
- * Swaps which person the tenancy is named after.
- *
- * The tenant record itself survives — same id, same unit, same lease dates and
- * figures — because the rent ledger, the documents and the unit's `tenantId`
- * all point at it. Only the person on it changes: the chosen member moves into
- * the primary slot, and the outgoing primary takes their place in the household.
- */
 export interface ChangePrimaryTenantInput {
   tenantId: string;
-  /** The household member being promoted. */
   memberId: string;
-  /** Identity for the incoming primary — a member record carries less than a tenant needs. */
   primary: Pick<
     Tenant,
-    | "name"
-    | "phone"
-    | "email"
-    | "occupation"
-    | "address"
-    | "city"
-    | "state"
-    | "pincode"
-    | "idType"
-    | "idNumber"
+    "name" | "phone" | "email" | "occupation" | "address" | "city" | "state" | "pincode" | "idType" | "idNumber"
   > &
     Partial<Pick<Tenant, "photo">>;
-  /** How the outgoing primary now relates to the incoming one. */
   outgoing: Omit<NewMemberInput, "name">;
 }
 
-export function changePrimaryTenant(
+/**
+ * Hands the tenancy to a household member.
+ *
+ * The API moves the roles; the promoted person's own record is updated
+ * separately, because the dialog collects details a member record never had —
+ * an email address, an ID number.
+ */
+export async function changePrimaryTenant(
   input: ChangePrimaryTenantInput,
 ): Promise<Tenant> {
-  const current = tenants.find((t) => t.id === input.tenantId);
-  if (!current) throw new Error(`Unknown tenant: ${input.tenantId}`);
+  const { data } = await http.post<ApiLease>(`/leases/${input.tenantId}/primary`, {
+    occupantId: input.memberId,
+    outgoingRelation: fromRelation(input.outgoing.relation),
+    outgoingRelationNote: input.outgoing.relationNote || undefined,
+  });
 
-  const promoted = current.members.find((m) => m.id === input.memberId);
-  if (!promoted) throw new Error(`Unknown member: ${input.memberId}`);
+  const promoted = (data.occupants ?? []).find((o) => o.role === "primary");
+  if (promoted) {
+    await http.patch(`/people/${promoted.personId}`, {
+      fullName: input.primary.name,
+      phone: input.primary.phone,
+      email: input.primary.email,
+      occupation: input.primary.occupation,
+      addressLine: input.primary.address,
+      city: input.primary.city,
+      state: input.primary.state,
+      pincode: input.primary.pincode,
+      idKind: toIdKind(input.primary.idType),
+      idNumber: input.primary.idNumber,
+    });
+  }
 
-  const next: Tenant = {
-    ...current,
-    ...input.primary,
-    photo: input.primary.photo ?? current.photo,
-    members: [
-      // The outgoing primary is listed first, mirroring where they came from.
-      { ...input.outgoing, id: nextId("m"), name: current.name },
-      ...current.members.filter((m) => m.id !== input.memberId),
-    ],
-  };
-
-  tenants = tenants.map((t) => (t.id === next.id ? next : t));
-
-  // Both of these denormalise the tenant's name rather than snapshotting it, so
-  // they follow the rename instead of going stale.
-  payments = payments.map((p) =>
-    p.tenantId === next.id ? { ...p, tenantName: next.name } : p,
-  );
-  documents = documents.map((d) =>
-    d.tenantId === next.id ? { ...d, tenantName: next.name } : d,
-  );
-
-  return delay(clone(next));
+  return getTenant(input.tenantId) as Promise<Tenant>;
 }
 
 /* ------------------------------------------------------------------ */
 /* Rent                                                                */
 /* ------------------------------------------------------------------ */
 
-export function listPayments(): Promise<RentPayment[]> {
-  return delay(clone(payments));
+/** Bills and payments carry only ids; the cards want the unit and property too. */
+async function tenancyIndex() {
+  const leases = await get<ApiLease[]>("/leases");
+  return new Map(
+    leases.map((lease) => [
+      lease.id,
+      {
+        unitId: lease.unitId,
+        propertyId: lease.unit?.propertyId ?? "",
+        propertyName: lease.unit?.property?.name ?? "",
+        tenantName:
+          (lease.occupants ?? []).find((o) => o.role === "primary")?.person.fullName ??
+          "",
+      },
+    ]),
+  );
 }
 
-export function listBills(): Promise<RentBill[]> {
-  return delay(clone(bills));
+export async function listBills(): Promise<RentBill[]> {
+  const [bills, index] = await Promise.all([
+    get<ApiBill[]>("/bills"),
+    tenancyIndex(),
+  ]);
+  return bills.map((bill) => {
+    const context = index.get(bill.leaseId);
+    return toBill(bill, context?.unitId ?? "", context?.propertyId ?? "");
+  });
+}
+
+export async function listPayments(): Promise<RentPayment[]> {
+  const [payments, index] = await Promise.all([
+    get<ApiPayment[]>("/payments"),
+    tenancyIndex(),
+  ]);
+  return payments.map((payment) => {
+    const context = index.get(payment.leaseId);
+    return toPayment(
+      payment,
+      context?.tenantName ?? "",
+      context?.unitId ?? "",
+      context?.propertyId ?? "",
+      context?.propertyName ?? "",
+    );
+  });
 }
 
 export interface NewBillInput {
@@ -343,7 +330,7 @@ export interface NewBillInput {
   month: string;
   rent: number;
   electricity: number;
-  electricityMode?: ElectricityMode;
+  electricityMode?: "meter" | "flat";
   meterPrevious?: number;
   meterCurrent?: number;
   unitRate?: number;
@@ -353,49 +340,53 @@ export interface NewBillInput {
   note?: string;
 }
 
-export function createBill(input: NewBillInput): Promise<RentBill> {
-  const tenant = tenants.find((t) => t.id === input.tenantId);
-  if (!tenant) throw new Error(`Unknown tenant: ${input.tenantId}`);
+export async function createBill(input: NewBillInput): Promise<RentBill> {
+  const metered = input.electricityMode === "meter";
 
-  // One bill per tenancy per month — re-billing a month replaces it rather
-  // than doubling what is owed.
-  const existing = bills.find(
-    (b) => b.tenantId === tenant.id && b.month === input.month,
-  );
+  const lines: Record<string, unknown>[] = [
+    { kind: "rent", amount: input.rent.toFixed(2) },
+    metered
+      ? {
+          kind: "electricity",
+          electricityMode: "meter",
+          meterPrevious: (input.meterPrevious ?? 0).toFixed(2),
+          meterCurrent: (input.meterCurrent ?? 0).toFixed(2),
+          unitRate: (input.unitRate ?? 0).toFixed(2),
+        }
+      : {
+          kind: "electricity",
+          electricityMode: "flat",
+          amount: input.electricity.toFixed(2),
+        },
+  ];
 
-  const bill: RentBill = {
-    id: existing?.id ?? nextId("b"),
-    tenantId: tenant.id,
-    unitId: tenant.unitId,
-    propertyId: tenant.propertyId,
-    month: input.month,
-    rent: input.rent,
-    electricity: input.electricity,
-    electricityMode: input.electricityMode ?? "flat",
-    meterPrevious: input.meterPrevious,
-    meterCurrent: input.meterCurrent,
-    unitRate: input.unitRate,
-    otherCharges: input.otherCharges ?? 0,
-    otherLabel: input.otherLabel,
-    dueDate: input.dueDate || `${input.month}-05`,
-    note: input.note,
-  };
+  if (input.otherCharges && input.otherCharges > 0) {
+    lines.push({
+      kind: "maintenance",
+      label: input.otherLabel || "Other charges",
+      amount: input.otherCharges.toFixed(2),
+    });
+  }
 
-  bills = existing
-    ? bills.map((b) => (b.id === existing.id ? bill : b))
-    : [...bills, bill];
+  const { data } = await http.post<ApiBill>("/bills", {
+    leaseId: input.tenantId,
+    period: input.month,
+    dueDate: input.dueDate || undefined,
+    note: input.note || undefined,
+    lines,
+  });
 
-  return delay(clone(bill));
+  const tenant = await getTenant(input.tenantId);
+  return toBill(data, tenant?.unitId ?? "", tenant?.propertyId ?? "");
 }
 
-export function deleteBill(id: string): Promise<{ id: string }> {
-  bills = bills.filter((b) => b.id !== id);
-  return delay({ id });
+export async function deleteBill(id: string): Promise<{ id: string }> {
+  await http.delete(`/bills/${id}`);
+  return { id };
 }
 
 export interface NewPaymentInput {
   tenantId: string;
-  /** "2026-09" — which month the money settles. */
   month: string;
   amount: number;
   date: string;
@@ -403,41 +394,42 @@ export interface NewPaymentInput {
   transactionId: string;
 }
 
-export function recordPayment(input: NewPaymentInput): Promise<RentPayment> {
-  const tenant = tenants.find((t) => t.id === input.tenantId);
-  if (!tenant) throw new Error(`Unknown tenant: ${input.tenantId}`);
+export async function recordPayment(input: NewPaymentInput): Promise<RentPayment> {
+  const { data } = await http.post<ApiPayment>("/payments", {
+    leaseId: input.tenantId,
+    period: input.month,
+    amount: input.amount.toFixed(2),
+    paidOn: input.date,
+    method: toMethod(input.method),
+    reference: input.transactionId || undefined,
+  });
 
-  const property = properties.find((p) => p.id === tenant.propertyId);
-
-  const payment: RentPayment = {
-    id: nextId("r"),
-    tenantId: tenant.id,
-    tenantName: tenant.name,
-    unitId: tenant.unitId,
-    propertyId: tenant.propertyId,
-    propertyName: property?.name ?? "",
-    amount: input.amount,
-    date: input.date,
-    method: input.method,
-    transactionId: input.transactionId,
-    // A recorded payment is money that arrived; whether the month is settled
-    // is the ledger's call, not this row's.
-    status: "paid",
-    month: input.month,
-  };
-
-  // Payments accumulate — a month may be settled in several instalments.
-  payments = [payment, ...payments];
-
-  return delay(clone(payment));
+  const tenant = await getTenant(input.tenantId);
+  return toPayment(
+    data,
+    tenant?.name ?? "",
+    tenant?.unitId ?? "",
+    tenant?.propertyId ?? "",
+    "",
+  );
 }
 
 /* ------------------------------------------------------------------ */
 /* Documents                                                           */
 /* ------------------------------------------------------------------ */
 
-export function listDocuments(): Promise<PropertyDocument[]> {
-  return delay(clone(documents));
+export async function listDocuments(): Promise<PropertyDocument[]> {
+  const [documents, index] = await Promise.all([
+    get<ApiDocument[]>("/documents"),
+    tenancyIndex(),
+  ]);
+  return documents.map((doc) =>
+    toDocument(
+      doc,
+      doc.leaseId ? index.get(doc.leaseId)?.tenantName : undefined,
+      doc.leaseId ? index.get(doc.leaseId)?.propertyName : undefined,
+    ),
+  );
 }
 
 export interface NewDocumentInput {
@@ -449,73 +441,68 @@ export interface NewDocumentInput {
   mimeType?: string;
   size?: string;
   previewUrl?: string;
+  sizeBytes?: number;
 }
 
-export function createDocument(
+export async function createDocument(
   input: NewDocumentInput,
 ): Promise<PropertyDocument> {
-  const tenant = tenants.find((t) => t.id === input.tenantId);
-  const property = properties.find((p) => p.id === input.propertyId);
-
-  const doc: PropertyDocument = {
-    id: nextId("d"),
-    name: input.name,
-    type: input.type,
-    tenantId: tenant?.id,
-    tenantName: tenant?.name,
-    propertyId: property?.id,
-    propertyName: property?.name,
-    uploadDate: new Date().toISOString().slice(0, 10),
-    size: input.size ?? "—",
-    fileName: input.fileName,
-    mimeType: input.mimeType,
-    previewUrl: input.previewUrl,
-  };
-  documents = [doc, ...documents];
-  return delay(clone(doc));
+  const { data } = await http.post<ApiDocument>("/documents", {
+    kind: toDocKind(input.type),
+    title: input.name,
+    leaseId: input.tenantId || undefined,
+    propertyId: input.propertyId || undefined,
+    // Object storage is not wired up yet, so the key is a placeholder the API
+    // will replace with the real one once uploads go through it.
+    storageKey: `pending/${Date.now()}-${input.fileName ?? "document"}`,
+    originalName: input.fileName ?? input.name,
+    mimeType: input.mimeType ?? "application/octet-stream",
+    sizeBytes: input.sizeBytes ?? 1,
+  });
+  return toDocument(data);
 }
 
-export function deleteDocument(id: string): Promise<{ id: string }> {
-  const doc = documents.find((d) => d.id === id);
-  if (doc?.previewUrl && typeof URL.revokeObjectURL === "function") {
-    // Otherwise the blob stays alive for the life of the tab.
-    URL.revokeObjectURL(doc.previewUrl);
-  }
-  documents = documents.filter((d) => d.id !== id);
-  return delay({ id });
+export async function deleteDocument(id: string): Promise<{ id: string }> {
+  await http.delete(`/documents/${id}`);
+  return { id };
 }
 
 /* ------------------------------------------------------------------ */
 /* Notifications                                                       */
 /* ------------------------------------------------------------------ */
 
-export function listNotifications(): Promise<AppNotification[]> {
-  return delay(clone(notifications));
+export async function listNotifications(): Promise<AppNotification[]> {
+  const data = await get<ApiNotification[]>("/notifications");
+  return data.map(toNotification);
 }
 
-export function markNotificationRead(id: string): Promise<AppNotification[]> {
-  notifications = notifications.map((n) =>
-    n.id === id ? { ...n, read: true } : n,
-  );
-  return delay(clone(notifications));
+export async function markNotificationRead(id: string): Promise<AppNotification[]> {
+  await http.patch(`/notifications/${id}/read`);
+  return listNotifications();
 }
 
-export function markAllNotificationsRead(): Promise<AppNotification[]> {
-  notifications = notifications.map((n) => ({ ...n, read: true }));
-  return delay(clone(notifications));
+export async function markAllNotificationsRead(): Promise<AppNotification[]> {
+  await http.patch("/notifications/read-all");
+  return listNotifications();
 }
 
 /* ------------------------------------------------------------------ */
 /* Owner                                                               */
 /* ------------------------------------------------------------------ */
 
-export function getOwnerProfile(): Promise<OwnerProfile> {
-  return delay(clone(owner));
+export async function getOwnerProfile(): Promise<OwnerProfile> {
+  return toOwnerProfile(await get<ApiOwner>("/me"));
 }
 
-export function updateOwnerProfile(
+export async function updateOwnerProfile(
   patch: Partial<OwnerProfile>,
 ): Promise<OwnerProfile> {
-  owner = { ...owner, ...patch };
-  return delay(clone(owner));
+  const { data } = await http.patch<ApiOwner>("/me", {
+    name: patch.name,
+    phone: patch.phone,
+    company: patch.company,
+    address: patch.address,
+    electricityRate: patch.electricityRate?.toFixed(2),
+  });
+  return toOwnerProfile(data);
 }

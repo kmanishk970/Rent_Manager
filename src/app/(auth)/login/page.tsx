@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -23,17 +23,27 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const [failure, setFailure] = useState<string | null>(null);
+
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { email: "rajesh.kapoor@rentflow.in", password: "" },
+    defaultValues: { email: "", password: "" },
   });
 
-  const onSubmit = handleSubmit(() => {
-    login();
+  const onSubmit = handleSubmit(async (values) => {
+    setFailure(null);
+    try {
+      await login(values.email, values.password);
+    } catch (error) {
+      // Wrong credentials are not a form-field problem, so they are shown
+      // above the form rather than hung off one of the inputs.
+      setFailure(error instanceof Error ? error.message : "Could not sign in");
+      return;
+    }
     // Send the user back to the page the route guard interrupted, if any.
     const next = searchParams.get("next");
     router.replace(next && next.startsWith("/") ? next : "/dashboard");
@@ -45,6 +55,15 @@ function LoginForm() {
         Welcome back
       </h2>
       <p className="mb-8 text-sm text-slate-500">Sign in to your account</p>
+
+      {failure && (
+        <p
+          role="alert"
+          className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
+        >
+          {failure}
+        </p>
+      )}
 
       <form onSubmit={onSubmit} className="space-y-5" noValidate>
         <Field label="Email address" htmlFor="email" error={errors.email?.message}>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -19,8 +20,10 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export default function SignupPage() {
-  const { login } = useAuth();
+  const { register: createAccount } = useAuth();
   const router = useRouter();
+
+  const [failure, setFailure] = useState<string | null>(null);
 
   const {
     register,
@@ -31,8 +34,20 @@ export default function SignupPage() {
     defaultValues: { name: "", email: "", password: "" },
   });
 
-  const onSubmit = handleSubmit(() => {
-    login();
+  const onSubmit = handleSubmit(async (values) => {
+    setFailure(null);
+    try {
+      await createAccount({
+        email: values.email,
+        password: values.password,
+        name: values.name,
+      });
+    } catch (error) {
+      setFailure(
+        error instanceof Error ? error.message : "Could not create the account",
+      );
+      return;
+    }
     router.replace("/dashboard");
   });
 
@@ -44,6 +59,15 @@ export default function SignupPage() {
       <p className="mb-8 text-sm text-slate-500">
         Start managing your properties today
       </p>
+
+      {failure && (
+        <p
+          role="alert"
+          className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
+        >
+          {failure}
+        </p>
+      )}
 
       <form onSubmit={onSubmit} className="space-y-5" noValidate>
         <Field label="Full name" htmlFor="name" error={errors.name?.message}>

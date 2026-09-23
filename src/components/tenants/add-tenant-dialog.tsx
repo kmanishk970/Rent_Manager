@@ -297,7 +297,12 @@ function StepTwo({ form }: { form: UseFormReturn<FormValues> }) {
           }}
         >
           <SelectTrigger id="t-property" className="w-full">
-            <SelectValue placeholder="Select property..." />
+            <SelectValue placeholder="Select property...">
+              {(value: string) => {
+                const match = properties?.find((p) => p.id === value);
+                return match ? `${match.name} — ${match.location}` : "Select property...";
+              }}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {(properties ?? []).map((p) => (
@@ -319,7 +324,12 @@ function StepTwo({ form }: { form: UseFormReturn<FormValues> }) {
             }}
           >
             <SelectTrigger id="t-floor" className="w-full">
-              <SelectValue placeholder="Select floor..." />
+              <SelectValue placeholder="Select floor...">
+                {(value: string) =>
+                  property?.floors.find((f) => f.id === value)?.name ??
+                  "Select floor..."
+                }
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {property.floors.map((f) => (

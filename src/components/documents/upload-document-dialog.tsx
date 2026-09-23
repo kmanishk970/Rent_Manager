@@ -85,7 +85,7 @@ export function UploadDocumentDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display text-lg font-semibold text-slate-900">
             Upload Document
@@ -120,7 +120,11 @@ export function UploadDocumentDialog({
               }
             >
               <SelectTrigger id="doc-type" className="w-full">
-                <SelectValue />
+                <SelectValue>
+                  {(value: DocumentType) =>
+                    DOCUMENT_TYPE_LABELS[value] ?? "Select a type"
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {Object.entries(DOCUMENT_TYPE_LABELS).map(([value, label]) => (
@@ -140,7 +144,11 @@ export function UploadDocumentDialog({
               }
             >
               <SelectTrigger id="doc-tenant" className="w-full">
-                <SelectValue placeholder="Not linked" />
+                <SelectValue placeholder="Not linked">
+                  {(value: string) =>
+                    tenants?.find((t) => t.id === value)?.name ?? "Not linked"
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Not linked</SelectItem>

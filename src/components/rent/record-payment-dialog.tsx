@@ -133,7 +133,7 @@ export function RecordPaymentDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display text-lg font-semibold text-slate-900">
             Record Rent Payment
@@ -144,7 +144,8 @@ export function RecordPaymentDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={onSubmit} className="space-y-4" noValidate>
+        <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col" noValidate>
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
           <Field
             label="Tenant"
             htmlFor="payment-tenant"
@@ -157,7 +158,12 @@ export function RecordPaymentDialog({
               }
             >
               <SelectTrigger id="payment-tenant" className="w-full">
-                <SelectValue placeholder="Select a tenant" />
+                <SelectValue placeholder="Select a tenant">
+                  {(value: string) =>
+                    tenants?.find((t) => t.id === value)?.name ??
+                    "Select a tenant"
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {(tenants ?? []).map((tenant) => (
@@ -277,7 +283,9 @@ export function RecordPaymentDialog({
             />
           </Field>
 
-          <DialogFooter>
+          </div>
+
+          <DialogFooter className="mt-4 border-t border-slate-200 pt-4">
             <Button
               type="button"
               variant="outline"

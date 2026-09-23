@@ -193,7 +193,17 @@ export interface PropertyDocument {
   propertyId?: string;
   propertyName?: string;
   uploadDate: string;
+  /** Human-readable, e.g. "2.4 MB". Seeded rows carry it as given. */
   size: string;
+  /** The file as chosen on disk, when one was picked. */
+  fileName?: string;
+  mimeType?: string;
+  /**
+   * An object URL for the picked file, so it can be opened in this session.
+   * Storage is not wired up, so it does not survive a reload — which is also
+   * true of everything else the mock API holds.
+   */
+  previewUrl?: string;
 }
 
 export interface AppNotification {

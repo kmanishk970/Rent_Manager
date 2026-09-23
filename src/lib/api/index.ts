@@ -445,6 +445,10 @@ export interface NewDocumentInput {
   type: DocumentType;
   tenantId?: string;
   propertyId?: string;
+  fileName?: string;
+  mimeType?: string;
+  size?: string;
+  previewUrl?: string;
 }
 
 export function createDocument(
@@ -462,13 +466,21 @@ export function createDocument(
     propertyId: property?.id,
     propertyName: property?.name,
     uploadDate: new Date().toISOString().slice(0, 10),
-    size: "—",
+    size: input.size ?? "—",
+    fileName: input.fileName,
+    mimeType: input.mimeType,
+    previewUrl: input.previewUrl,
   };
   documents = [doc, ...documents];
   return delay(clone(doc));
 }
 
 export function deleteDocument(id: string): Promise<{ id: string }> {
+  const doc = documents.find((d) => d.id === id);
+  if (doc?.previewUrl && typeof URL.revokeObjectURL === "function") {
+    // Otherwise the blob stays alive for the life of the tab.
+    URL.revokeObjectURL(doc.previewUrl);
+  }
   documents = documents.filter((d) => d.id !== id);
   return delay({ id });
 }

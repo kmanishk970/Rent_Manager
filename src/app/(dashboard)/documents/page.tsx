@@ -169,6 +169,9 @@ export default function DocumentsPage() {
                   <div className="mt-2 space-y-0.5 text-xs text-slate-400">
                     {doc.tenantName && <div>Tenant: {doc.tenantName}</div>}
                     {doc.propertyName && <div>Property: {doc.propertyName}</div>}
+                    {doc.fileName && doc.fileName !== doc.name && (
+                      <div className="truncate">File: {doc.fileName}</div>
+                    )}
                     <div className="flex items-center gap-2 pt-1">
                       <span>{doc.size}</span>
                       <span>·</span>
@@ -179,18 +182,42 @@ export default function DocumentsPage() {
               </div>
 
               <div className="mt-4 flex gap-2 border-t border-slate-100 pt-3">
-                <button
-                  type="button"
-                  className="flex-1 rounded-lg py-1.5 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50"
+                <a
+                  href={doc.previewUrl ?? undefined}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-disabled={!doc.previewUrl}
+                  title={
+                    doc.previewUrl
+                      ? `Open ${doc.fileName ?? doc.name}`
+                      : "No file attached to this record"
+                  }
+                  onClick={(e) => {
+                    if (!doc.previewUrl) e.preventDefault();
+                  }}
+                  className={`flex-1 rounded-lg py-1.5 text-center text-xs font-medium transition-colors ${
+                    doc.previewUrl
+                      ? "text-blue-600 hover:bg-blue-50"
+                      : "cursor-not-allowed text-slate-300"
+                  }`}
                 >
                   View
-                </button>
-                <button
-                  type="button"
-                  className="flex-1 rounded-lg py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+                </a>
+                <a
+                  href={doc.previewUrl ?? undefined}
+                  download={doc.fileName ?? doc.name}
+                  aria-disabled={!doc.previewUrl}
+                  onClick={(e) => {
+                    if (!doc.previewUrl) e.preventDefault();
+                  }}
+                  className={`flex-1 rounded-lg py-1.5 text-center text-xs font-medium transition-colors ${
+                    doc.previewUrl
+                      ? "text-slate-600 hover:bg-slate-50"
+                      : "cursor-not-allowed text-slate-300"
+                  }`}
                 >
                   Download
-                </button>
+                </a>
                 <button
                   type="button"
                   onClick={() => handleDelete(doc.id, doc.name)}

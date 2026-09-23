@@ -1,11 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { textField } from "@/lib/validation";
 import { toast } from "sonner";
-import { UploadCloud } from "lucide-react";
+import { FilePicker, formatBytes } from "@/components/documents/file-picker";
 import { Field } from "@/components/form/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,11 @@ export function UploadDocumentDialog({
   const createDocument = useCreateDocument();
   const { data: tenants } = useTenants();
 
+  // The file lives outside the form: react-hook-form would only carry a
+  // FileList around, and the picker needs its own rejection message anyway.
+  const [file, setFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string>();
+
   const {
     register,
     handleSubmit,
@@ -64,16 +70,39 @@ export function UploadDocumentDialog({
     defaultValues: { name: "", type: "agreement", tenantId: "" },
   });
 
+  const clearFile = () => {
+    setFile(null);
+    setFileError(undefined);
+  };
+
+  const closeAndReset = () => {
+    reset();
+    clearFile();
+  };
+
   const onSubmit = handleSubmit(async (values) => {
+    if (!file) {
+      setFileError("Choose a file to attach");
+      return;
+    }
+
     const tenant = tenants?.find((t) => t.id === values.tenantId);
+
     await createDocument.mutateAsync({
       name: values.name,
       type: values.type,
       tenantId: values.tenantId || undefined,
       propertyId: tenant?.propertyId,
+      fileName: file.name,
+      mimeType: file.type,
+      size: formatBytes(file.size),
+      // Lets the document be opened in this session. Storage is still the
+      // backend's job, so it does not outlive a reload.
+      previewUrl: URL.createObjectURL(file),
     });
-    toast.success("Document added");
-    reset();
+
+    toast.success(`${values.name} attached`);
+    closeAndReset();
     onOpenChange(false);
   });
 
@@ -81,7 +110,7 @@ export function UploadDocumentDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next) reset();
+        if (!next) closeAndReset();
         onOpenChange(next);
       }}
     >
@@ -91,8 +120,8 @@ export function UploadDocumentDialog({
             Upload Document
           </DialogTitle>
           <DialogDescription>
-            File storage isn&apos;t wired up yet — this records the metadata
-            only.
+            Attach a file and file it against a tenant. It opens from the
+            documents list; permanent storage arrives with the backend.
           </DialogDescription>
         </DialogHeader>
 
@@ -161,18 +190,21 @@ export function UploadDocumentDialog({
             </Select>
           </Field>
 
-          <div className="rounded-xl border-2 border-dashed border-slate-300 p-8 text-center">
-            <UploadCloud
-              className="mx-auto mb-2 size-8 text-slate-400"
-              strokeWidth={1.5}
-            />
-            <p className="text-sm font-medium text-slate-700">
-              File upload coming with the backend
-            </p>
-            <p className="mt-1 text-xs text-slate-400">
-              PDF, JPG, PNG up to 20MB
-            </p>
-          </div>
+          <FilePicker
+            file={file}
+            error={fileError}
+            onPick={(picked, reason) => {
+              setFile(picked);
+              setFileError(reason ?? undefined);
+              // Saves retyping what the file is already called.
+              if (picked && !watch("name")) {
+                setValue("name", picked.name.replace(/[.][^.]+$/, ""), {
+                  shouldValidate: true,
+                });
+              }
+            }}
+            onClear={clearFile}
+          />
 
           <DialogFooter>
             <Button

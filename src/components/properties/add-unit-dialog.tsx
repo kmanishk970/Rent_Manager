@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { moneyField } from "@/lib/validation";
 import { toast } from "sonner";
 import { Field } from "@/components/form/field";
 import { Input } from "@/components/ui/input";
@@ -20,9 +21,14 @@ import { useCreateUnit } from "@/lib/queries";
 import { inr } from "@/lib/format";
 
 const schema = z.object({
-  number: z.string().min(1, "Unit number is required"),
-  rent: z.coerce.number().positive("Enter the monthly rent"),
-  deposit: z.coerce.number().nonnegative("Enter the deposit"),
+  number: z
+    .string()
+    .trim()
+    .min(1, "Unit number is required")
+    .max(12, "Unit number is too long")
+    .regex(/^[A-Za-z0-9-]+$/, "Letters, numbers and hyphens only"),
+  rent: moneyField("the monthly rent"),
+  deposit: moneyField("the deposit", { min: 0 }),
 });
 
 type FormValues = z.input<typeof schema>;

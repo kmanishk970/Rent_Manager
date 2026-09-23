@@ -33,7 +33,11 @@ export type MemberRelation =
   | "Friend"
   | "Other";
 
-export type PaymentStatus = "paid" | "pending" | "overdue";
+/**
+ * How a month stands once its payments are set against its charges.
+ * "partial" is money received but short of the total, before the due date.
+ */
+export type PaymentStatus = "paid" | "partial" | "pending" | "overdue";
 
 export type DocumentType =
   | "agreement"
@@ -122,6 +126,28 @@ export interface Tenant {
   members: HouseholdMember[];
 }
 
+/**
+ * What a tenancy owes for one month: the rent plus whatever else is billed on
+ * top of it. Payments are recorded separately and set against this, so a month
+ * can be settled in instalments and any shortfall or advance carries forward.
+ */
+export interface RentBill {
+  id: string;
+  tenantId: string;
+  unitId: string;
+  propertyId: string;
+  /** "2026-09" — sortable, and unambiguous about which year it belongs to. */
+  month: string;
+  rent: number;
+  electricity: number;
+  /** Maintenance, water, parking — whatever else the landlord adds. */
+  otherCharges: number;
+  otherLabel?: string;
+  /** "2026-09-05" — after this the month counts as overdue, not pending. */
+  dueDate: string;
+  note?: string;
+}
+
 export interface RentPayment {
   id: string;
   tenantId: string;
@@ -134,6 +160,7 @@ export interface RentPayment {
   method: PaymentMethod;
   transactionId: string;
   status: PaymentStatus;
+  /** "2026-09" — the month this money is set against. */
   month: string;
 }
 

@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { occupancyChartData, recentActivity, rentChartData } from "@/lib/mock-data";
 import { useOwnerProfile, usePayments, useProperties } from "@/lib/queries";
-import { expandMonth, inr, inrK, inrL } from "@/lib/format";
+import { inr, inrK, inrL, monthLong } from "@/lib/format";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GlowCard } from "@/components/ui/glow-card";
 
@@ -125,7 +125,7 @@ export default function DashboardPage() {
 
   // The billing period the ledger is currently reporting on. Derived rather
   // than hard-coded, which is what the prototype did.
-  const period = payments?.[0]?.month ? expandMonth(payments[0].month) : "";
+  const period = payments?.[0]?.month ? monthLong(payments[0].month) : "";
 
   return (
     <div className="space-y-6">

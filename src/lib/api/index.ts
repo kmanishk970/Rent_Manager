@@ -3,6 +3,7 @@ import {
   notifications as seedNotifications,
   ownerProfile as seedOwner,
   properties as seedProperties,
+  rentBills as seedBills,
   rentPayments as seedPayments,
   tenants as seedTenants,
 } from "@/lib/mock-data";
@@ -14,6 +15,7 @@ import type {
   OwnerProfile,
   Property,
   PropertyDocument,
+  RentBill,
   RentPayment,
   Tenant,
   Unit,
@@ -43,6 +45,7 @@ function clone<T>(value: T): T {
 
 let properties: Property[] = clone(seedProperties);
 let tenants: Tenant[] = clone(seedTenants);
+let bills: RentBill[] = clone(seedBills);
 let payments: RentPayment[] = clone(seedPayments);
 let documents: PropertyDocument[] = clone(seedDocuments);
 let notifications: AppNotification[] = clone(seedNotifications);
@@ -330,8 +333,61 @@ export function listPayments(): Promise<RentPayment[]> {
   return delay(clone(payments));
 }
 
+export function listBills(): Promise<RentBill[]> {
+  return delay(clone(bills));
+}
+
+export interface NewBillInput {
+  tenantId: string;
+  month: string;
+  rent: number;
+  electricity: number;
+  otherCharges?: number;
+  otherLabel?: string;
+  dueDate?: string;
+  note?: string;
+}
+
+export function createBill(input: NewBillInput): Promise<RentBill> {
+  const tenant = tenants.find((t) => t.id === input.tenantId);
+  if (!tenant) throw new Error(`Unknown tenant: ${input.tenantId}`);
+
+  // One bill per tenancy per month — re-billing a month replaces it rather
+  // than doubling what is owed.
+  const existing = bills.find(
+    (b) => b.tenantId === tenant.id && b.month === input.month,
+  );
+
+  const bill: RentBill = {
+    id: existing?.id ?? nextId("b"),
+    tenantId: tenant.id,
+    unitId: tenant.unitId,
+    propertyId: tenant.propertyId,
+    month: input.month,
+    rent: input.rent,
+    electricity: input.electricity,
+    otherCharges: input.otherCharges ?? 0,
+    otherLabel: input.otherLabel,
+    dueDate: input.dueDate || `${input.month}-05`,
+    note: input.note,
+  };
+
+  bills = existing
+    ? bills.map((b) => (b.id === existing.id ? bill : b))
+    : [...bills, bill];
+
+  return delay(clone(bill));
+}
+
+export function deleteBill(id: string): Promise<{ id: string }> {
+  bills = bills.filter((b) => b.id !== id);
+  return delay({ id });
+}
+
 export interface NewPaymentInput {
   tenantId: string;
+  /** "2026-09" — which month the money settles. */
+  month: string;
   amount: number;
   date: string;
   method: RentPayment["method"];
@@ -355,20 +411,14 @@ export function recordPayment(input: NewPaymentInput): Promise<RentPayment> {
     date: input.date,
     method: input.method,
     transactionId: input.transactionId,
+    // A recorded payment is money that arrived; whether the month is settled
+    // is the ledger's call, not this row's.
     status: "paid",
-    month: new Date(input.date).toLocaleDateString("en-IN", {
-      month: "short",
-      year: "numeric",
-    }),
+    month: input.month,
   };
 
-  // A recorded payment supersedes any outstanding row for the same tenant.
-  payments = [
-    payment,
-    ...payments.filter(
-      (p) => !(p.tenantId === tenant.id && p.status !== "paid"),
-    ),
-  ];
+  // Payments accumulate — a month may be settled in several instalments.
+  payments = [payment, ...payments];
 
   return delay(clone(payment));
 }

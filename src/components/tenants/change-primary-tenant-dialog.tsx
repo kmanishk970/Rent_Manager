@@ -31,28 +31,47 @@ import {
   relationLabel,
   relationTone,
 } from "@/lib/members";
+import {
+  checkIdNumber,
+  emailField,
+  formatIdNumber,
+  idFieldHint,
+  mobileField,
+  nameField,
+  pincodeField,
+  textField,
+} from "@/lib/validation";
 import type { IdType, MemberRelation, Tenant } from "@/types";
 
 const schema = z
   .object({
     // Identity for the member being promoted — a tenancy needs more than a
     // member record carries, so the gaps get filled in here.
-    name: z.string().min(2, "Full name is required"),
-    phone: z.string().min(8, "Enter a valid mobile number"),
-    email: z.string().min(1, "Email is required").email("Enter a valid email"),
-    occupation: z.string().min(2, "Occupation is required"),
-    address: z.string().min(3, "Address is required"),
-    city: z.string().min(2, "City is required"),
-    state: z.string().min(2, "State is required"),
-    pincode: z.string().regex(/^\d{6}$/, "Enter a 6-digit PIN code"),
+    name: nameField(),
+    phone: mobileField(),
+    email: emailField(),
+    occupation: textField("Occupation"),
+    address: textField("Address", { min: 5, max: 160 }),
+    city: textField("City"),
+    state: textField("State"),
+    pincode: pincodeField(),
     idType: z.enum(MEMBER_ID_TYPES),
-    idNumber: z.string().min(4, "ID number is required"),
+    idNumber: z.string().trim().min(1, "ID number is required"),
 
     // Where the outgoing primary lands in the household.
     outgoingRelation: z.enum(RELATIONS),
     outgoingRelationNote: z.string(),
   })
   .superRefine((values, ctx) => {
+    const id = checkIdNumber(values.idType, values.idNumber);
+    if (!id.ok) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["idNumber"],
+        message: id.message,
+      });
+    }
+
     if (
       values.outgoingRelation === "Other" &&
       values.outgoingRelationNote.trim().length < 2
@@ -63,7 +82,11 @@ const schema = z
         message: "Describe the relation",
       });
     }
-  });
+  })
+  .transform((values) => ({
+    ...values,
+    idNumber: formatIdNumber(values.idType, values.idNumber),
+  }));
 
 type FormValues = z.infer<typeof schema>;
 
@@ -316,6 +339,9 @@ export function ChangePrimaryTenantDialog({
                       >
                         <Input
                           id="cp-phone"
+                          type="tel"
+                          inputMode="tel"
+                          maxLength={18}
                           placeholder="+91 98765 43210"
                           {...register("phone")}
                         />
@@ -354,6 +380,7 @@ export function ChangePrimaryTenantDialog({
                         <Input
                           id="cp-pincode"
                           inputMode="numeric"
+                          maxLength={6}
                           {...register("pincode")}
                         />
                       </Field>
@@ -387,9 +414,15 @@ export function ChangePrimaryTenantDialog({
                         <Select
                           value={watch("idType")}
                           onValueChange={(value) =>
-                            setValue("idType", (value as IdType) ?? "Aadhaar", {
-                              shouldValidate: true,
-                            })
+                            {
+                              setValue("idType", (value as IdType) ?? "Aadhaar", {
+                                shouldValidate: true,
+                              });
+                              // The format check depends on the type above it.
+                              if (form.getValues("idNumber")) {
+                                form.trigger("idNumber");
+                              }
+                            }
                           }
                         >
                           <SelectTrigger id="cp-idtype" className="w-full">
@@ -412,7 +445,8 @@ export function ChangePrimaryTenantDialog({
                       >
                         <Input
                           id="cp-idnumber"
-                          placeholder="2345 6789 0123"
+                          autoComplete="off"
+                          {...idFieldHint(watch("idType"))}
                           {...register("idNumber")}
                         />
                       </Field>

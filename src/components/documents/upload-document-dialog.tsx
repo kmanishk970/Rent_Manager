@@ -3,6 +3,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { textField } from "@/lib/validation";
 import { toast } from "sonner";
 import { UploadCloud } from "lucide-react";
 import { Field } from "@/components/form/field";
@@ -28,7 +29,7 @@ import { DOCUMENT_TYPE_LABELS } from "@/lib/documents";
 import type { DocumentType } from "@/types";
 
 const schema = z.object({
-  name: z.string().min(3, "Give the document a name"),
+  name: textField("Document name", { min: 3, max: 120 }),
   type: z.enum([
     "agreement",
     "id-proof",

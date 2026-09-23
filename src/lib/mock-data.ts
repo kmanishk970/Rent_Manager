@@ -3,6 +3,7 @@ import type {
   OwnerProfile,
   Property,
   PropertyDocument,
+  RentBill,
   RentPayment,
   Tenant,
 } from "@/types";
@@ -138,10 +139,10 @@ export const tenants: Tenant[] = [
     { id: "m4", name: "Rohan Bhatia", relation: "Other", relationNote: "Cousin", phone: "+91 76543 88888", age: 24, occupation: "Student" },
   ] },
   { id: "t4", name: "Priya Nair", photo: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop&auto=format", phone: "+91 65432 10987", email: "priya.nair@gmail.com", address: "3, Cunningham Road", city: "Bangalore", state: "Karnataka", pincode: "560052", idType: "Aadhaar", idNumber: "3456 7890 1234", unitId: "u202", propertyId: "p1", floorId: "f2", rentAmount: 22000, deposit: 66000, leaseStart: "2024-07-01", leaseEnd: "2025-06-30", emergencyContact: "Suresh Nair", emergencyPhone: "+91 65432 44444", occupation: "Doctor", members: [] },
-  { id: "t5", name: "Rahul Sharma", photo: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop&auto=format", phone: "+91 54321 09876", email: "rahul.sharma@hotmail.com", address: "67, Infantry Road", city: "Bangalore", state: "Karnataka", pincode: "560001", idType: "Voter ID", idNumber: "KA/01/234/567890", unitId: "u204", propertyId: "p1", floorId: "f2", rentAmount: 25000, deposit: 75000, leaseStart: "2024-02-01", leaseEnd: "2026-01-31", emergencyContact: "Sunita Sharma", emergencyPhone: "+91 54321 55555", occupation: "Chartered Accountant", members: [] },
+  { id: "t5", name: "Rahul Sharma", photo: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop&auto=format", phone: "+91 54321 09876", email: "rahul.sharma@hotmail.com", address: "67, Infantry Road", city: "Bangalore", state: "Karnataka", pincode: "560001", idType: "Voter ID", idNumber: "KAB1234567", unitId: "u204", propertyId: "p1", floorId: "f2", rentAmount: 25000, deposit: 75000, leaseStart: "2024-02-01", leaseEnd: "2026-01-31", emergencyContact: "Sunita Sharma", emergencyPhone: "+91 54321 55555", occupation: "Chartered Accountant", members: [] },
   { id: "t6", name: "Ananya Krishnan", photo: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&auto=format", phone: "+91 43210 98765", email: "ananya.k@gmail.com", address: "22, Richmond Circle", city: "Bangalore", state: "Karnataka", pincode: "560025", idType: "Aadhaar", idNumber: "5678 9012 3456", unitId: "u301", propertyId: "p1", floorId: "f3", rentAmount: 25000, deposit: 75000, leaseStart: "2023-09-01", leaseEnd: "2025-08-31", emergencyContact: "Ravi Krishnan", emergencyPhone: "+91 43210 66666", occupation: "UI Designer", members: [] },
   { id: "t7", name: "Kiran Patel", photo: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200&h=200&fit=crop&auto=format", phone: "+91 32109 87654", email: "kiran.patel@company.in", address: "90, Lavelle Road", city: "Bangalore", state: "Karnataka", pincode: "560001", idType: "PAN", idNumber: "FGHIJ5678K", unitId: "u303", propertyId: "p1", floorId: "f3", rentAmount: 28000, deposit: 84000, leaseStart: "2024-04-01", leaseEnd: "2025-03-31", emergencyContact: "Meena Patel", emergencyPhone: "+91 32109 77777", occupation: "Product Manager", members: [] },
-  { id: "t8", name: "Deepa Menon", photo: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&h=200&fit=crop&auto=format", phone: "+91 21098 76543", email: "deepa.menon@tech.com", address: "5, Whitefield Main Road", city: "Bangalore", state: "Karnataka", pincode: "560066", idType: "Driving License", idNumber: "KA01 2024 12345", unitId: "u401", propertyId: "p2", floorId: "f4", rentAmount: 15000, deposit: 45000, leaseStart: "2024-05-01", leaseEnd: "2025-04-30", emergencyContact: "Arun Menon", emergencyPhone: "+91 21098 88888", occupation: "Data Scientist", members: [] },
+  { id: "t8", name: "Deepa Menon", photo: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&h=200&fit=crop&auto=format", phone: "+91 21098 76543", email: "deepa.menon@tech.com", address: "5, Whitefield Main Road", city: "Bangalore", state: "Karnataka", pincode: "560066", idType: "Driving License", idNumber: "KA01 2024 1234567", unitId: "u401", propertyId: "p2", floorId: "f4", rentAmount: 15000, deposit: 45000, leaseStart: "2024-05-01", leaseEnd: "2025-04-30", emergencyContact: "Arun Menon", emergencyPhone: "+91 21098 88888", occupation: "Data Scientist", members: [] },
   { id: "t9", name: "Suresh Kumar", photo: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=200&h=200&fit=crop&auto=format", phone: "+91 10987 65432", email: "suresh.kumar@gmail.com", address: "18, ITPL Road", city: "Bangalore", state: "Karnataka", pincode: "560066", idType: "Aadhaar", idNumber: "6789 0123 4567", unitId: "u403", propertyId: "p2", floorId: "f4", rentAmount: 16000, deposit: 48000, leaseStart: "2023-11-01", leaseEnd: "2024-10-31", emergencyContact: "Lakshmi Kumar", emergencyPhone: "+91 10987 99999", occupation: "Teacher", members: [] },
   { id: "t10", name: "Neha Gupta", photo: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop&auto=format", phone: "+91 99876 54321", email: "neha.gupta@startup.io", address: "30, Marathahalli Bridge", city: "Bangalore", state: "Karnataka", pincode: "560037", idType: "PAN", idNumber: "LMNOP9012Q", unitId: "u501", propertyId: "p2", floorId: "f5", rentAmount: 18000, deposit: 54000, leaseStart: "2024-08-01", leaseEnd: "2025-07-31", emergencyContact: "Anil Gupta", emergencyPhone: "+91 99876 10101", occupation: "Entrepreneur", members: [] },
   { id: "t11", name: "Amit Joshi", photo: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&h=200&fit=crop&auto=format", phone: "+91 88765 43210", email: "amit.joshi@finance.co", address: "7, Outer Ring Road", city: "Bangalore", state: "Karnataka", pincode: "560037", idType: "Passport", idNumber: "M9876543", unitId: "u503", propertyId: "p2", floorId: "f5", rentAmount: 18000, deposit: 54000, leaseStart: "2024-06-01", leaseEnd: "2025-05-31", emergencyContact: "Sunita Joshi", emergencyPhone: "+91 88765 20202", occupation: "Financial Analyst", members: [] },
@@ -155,22 +156,121 @@ const months = [
   "Mar 2026", "Apr 2026", "May 2026", "Jun 2026", "Jul 2026", "Aug 2026", "Sep 2026",
 ];
 
-export const rentPayments: RentPayment[] = [
-  { id: "r1", tenantId: "t1", tenantName: "Arjun Mehta", unitId: "u101", propertyId: "p1", propertyName: "Sunrise Apartments", amount: 18000, date: "2026-09-05", method: "Bank Transfer", transactionId: "TXN2609001", status: "paid", month: "Sep 2026" },
-  { id: "r2", tenantId: "t2", tenantName: "Sneha Reddy", unitId: "u102", propertyId: "p1", propertyName: "Sunrise Apartments", amount: 18000, date: "2026-09-03", method: "UPI", transactionId: "UPI2609002", status: "paid", month: "Sep 2026" },
-  { id: "r3", tenantId: "t3", tenantName: "Vikram Singh", unitId: "u201", propertyId: "p1", propertyName: "Sunrise Apartments", amount: 22000, date: "", method: "Bank Transfer", transactionId: "", status: "pending", month: "Sep 2026" },
-  { id: "r4", tenantId: "t4", tenantName: "Priya Nair", unitId: "u202", propertyId: "p1", propertyName: "Sunrise Apartments", amount: 22000, date: "2026-09-08", method: "Cash", transactionId: "CASH2609004", status: "paid", month: "Sep 2026" },
-  { id: "r5", tenantId: "t5", tenantName: "Rahul Sharma", unitId: "u204", propertyId: "p1", propertyName: "Sunrise Apartments", amount: 25000, date: "", method: "Bank Transfer", transactionId: "", status: "overdue", month: "Sep 2026" },
-  { id: "r6", tenantId: "t6", tenantName: "Ananya Krishnan", unitId: "u301", propertyId: "p1", propertyName: "Sunrise Apartments", amount: 25000, date: "2026-09-02", method: "Bank Transfer", transactionId: "TXN2609006", status: "paid", month: "Sep 2026" },
-  { id: "r7", tenantId: "t7", tenantName: "Kiran Patel", unitId: "u303", propertyId: "p1", propertyName: "Sunrise Apartments", amount: 28000, date: "", method: "Bank Transfer", transactionId: "", status: "pending", month: "Sep 2026" },
-  { id: "r8", tenantId: "t8", tenantName: "Deepa Menon", unitId: "u401", propertyId: "p2", propertyName: "Green Valley Residency", amount: 15000, date: "2026-09-01", method: "UPI", transactionId: "UPI2609008", status: "paid", month: "Sep 2026" },
-  { id: "r9", tenantId: "t9", tenantName: "Suresh Kumar", unitId: "u403", propertyId: "p2", propertyName: "Green Valley Residency", amount: 16000, date: "", method: "Bank Transfer", transactionId: "", status: "overdue", month: "Sep 2026" },
-  { id: "r10", tenantId: "t10", tenantName: "Neha Gupta", unitId: "u501", propertyId: "p2", propertyName: "Green Valley Residency", amount: 18000, date: "2026-09-06", method: "Cheque", transactionId: "CHQ2609010", status: "paid", month: "Sep 2026" },
-  { id: "r11", tenantId: "t11", tenantName: "Amit Joshi", unitId: "u503", propertyId: "p2", propertyName: "Green Valley Residency", amount: 18000, date: "", method: "Bank Transfer", transactionId: "", status: "pending", month: "Sep 2026" },
-  { id: "r12", tenantId: "t12", tenantName: "TechWave Solutions", unitId: "u601", propertyId: "p3", propertyName: "Urban Heights", amount: 35000, date: "2026-09-01", method: "Bank Transfer", transactionId: "TXN2609012", status: "paid", month: "Sep 2026" },
-  { id: "r13", tenantId: "t13", tenantName: "Creative Studios", unitId: "u701", propertyId: "p3", propertyName: "Urban Heights", amount: 30000, date: "2026-09-04", method: "Bank Transfer", transactionId: "TXN2609013", status: "paid", month: "Sep 2026" },
-  { id: "r14", tenantId: "t14", tenantName: "DataSync Analytics", unitId: "u702", propertyId: "p3", propertyName: "Urban Heights", amount: 30000, date: "", method: "Bank Transfer", transactionId: "", status: "pending", month: "Sep 2026" },
-];
+/* ------------------------------------------------------------------ */
+/* Rent ledger                                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The seed's "current" month. Pinned rather than read from the clock so the
+ * fixture is stable — the ledger's own paid/overdue reasoning still runs
+ * against the real date.
+ */
+const SEED_MONTH = "2026-09";
+
+/** Steps a "YYYY-MM" key back by `n` months without pulling in a date library. */
+function monthBack(key: string, n: number): string {
+  const [y, m] = key.split("-").map(Number);
+  const zero = y * 12 + (m - 1) - n;
+  return `${Math.floor(zero / 12)}-${String((zero % 12) + 1).padStart(2, "0")}`;
+}
+
+/** How many months of history each tenancy gets. */
+const HISTORY = 5;
+
+/**
+ * Bills and payments, generated per tenant so the ledger has something with
+ * real shape in it: months settled in full, a month paid short that carries its
+ * dues forward, a month overpaid that carries a credit, and a month nobody has
+ * paid at all.
+ *
+ * Deterministic on the tenant's position — no clock, no randomness — so the
+ * fixture renders the same on the server and the client.
+ */
+function buildLedger(): { bills: RentBill[]; payments: RentPayment[] } {
+  const bills: RentBill[] = [];
+  const payments: RentPayment[] = [];
+  let billSeq = 0;
+  let paySeq = 0;
+
+  tenants.forEach((tenant, index) => {
+    const property = properties.find((prop) => prop.id === tenant.propertyId);
+    const startMonth = tenant.leaseStart.slice(0, 7);
+    const endMonth = tenant.leaseEnd.slice(0, 7);
+    const anchor = endMonth < SEED_MONTH ? endMonth : SEED_MONTH;
+
+    for (let back = HISTORY - 1; back >= 0; back--) {
+      const month = monthBack(anchor, back);
+      // Nothing is billed outside the lease.
+      if (month < startMonth || month > endMonth) continue;
+
+      // 300–850, varying by tenant and month so no two rows look alike.
+      const electricity = 300 + (((index * 7 + back * 5) % 12) * 50);
+      const rent = tenant.rentAmount;
+      const total = rent + electricity;
+
+      bills.push({
+        id: `b${++billSeq}`,
+        tenantId: tenant.id,
+        unitId: tenant.unitId,
+        propertyId: tenant.propertyId,
+        month,
+        rent,
+        electricity,
+        otherCharges: 0,
+        dueDate: `${month}-05`,
+      });
+
+      // The newest month is where the interesting cases live; everything
+      // older is settled so the carried balance starts from a clean slate.
+      const behaviour = back === 0 ? index % 5 : back === 1 && index % 5 === 1 ? 5 : 0;
+
+      const record = (amount: number, day: string, method: RentPayment["method"]) => {
+        payments.push({
+          id: `r${++paySeq}`,
+          tenantId: tenant.id,
+          tenantName: tenant.name,
+          unitId: tenant.unitId,
+          propertyId: tenant.propertyId,
+          propertyName: property?.name ?? "",
+          amount,
+          date: `${month}-${day}`,
+          method,
+          transactionId: `TXN${month.replace("-", "")}${String(paySeq).padStart(3, "0")}`,
+          status: "paid",
+          month,
+        });
+      };
+
+      switch (behaviour) {
+        case 0: // settled in full
+          record(total, "03", "Bank Transfer");
+          break;
+        case 1: // rent only — the electricity is left short
+          record(rent, "04", "UPI");
+          break;
+        case 2: // nothing received
+          break;
+        case 3: // overpaid, leaving a credit to carry
+          record(total + 500, "02", "Bank Transfer");
+          break;
+        case 4: // settled across two instalments
+          record(Math.round(total / 2), "03", "UPI");
+          record(total - Math.round(total / 2), "14", "Cash");
+          break;
+        case 5: // an older month left short, so its dues carry forward
+          record(total - 500, "06", "Cash");
+          break;
+      }
+    }
+  });
+
+  return { bills, payments };
+}
+
+const ledger = buildLedger();
+
+export const rentBills: RentBill[] = ledger.bills;
+export const rentPayments: RentPayment[] = ledger.payments;
 
 const collectedSeries = [145000, 162000, 158000, 170000, 155000, 168000, 175000, 172000, 180000, 176000, 182000, 185000, 245000];
 const pendingSeries = [25000, 18000, 30000, 15000, 22000, 12000, 18000, 20000, 15000, 19000, 14000, 12000, 68000];

@@ -6,13 +6,9 @@ import Image from "next/image";
 import { ChevronRight, FileText, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { HouseholdMembersCard } from "@/components/tenants/household-members-card";
-import {
-  useDocuments,
-  usePayments,
-  useProperties,
-  useTenants,
-} from "@/lib/queries";
-import { formatDate, inr, leaseProgress } from "@/lib/format";
+import { RentHistoryCard } from "@/components/rent/rent-history-card";
+import { useDocuments, useProperties, useTenants } from "@/lib/queries";
+import { formatDate, inr, tenancyYear } from "@/lib/format";
 import { householdSummary } from "@/lib/members";
 import type { UnitStatus } from "@/types";
 
@@ -42,7 +38,6 @@ export default function UnitDetailPage({
   const { data: properties, isPending } = useProperties();
   const { data: tenants } = useTenants();
   const { data: documents } = useDocuments();
-  const { data: payments } = usePayments();
 
   if (isPending || !properties) {
     return (
@@ -90,14 +85,9 @@ export default function UnitDetailPage({
     ? (documents ?? []).filter((d) => d.tenantId === tenant.id)
     : [];
 
-  // The prototype hard-coded this row. It now reflects the real ledger.
-  const latestPayment = tenant
-    ? (payments ?? []).find((p) => p.tenantId === tenant.id)
-    : undefined;
-
-  const progress = tenant
-    ? leaseProgress(tenant.leaseStart, tenant.leaseEnd)
-    : 0;
+  // Counted from the lease start's anniversary, so a long tenancy shows the
+  // year it is actually in rather than a bar stuck at 100%.
+  const year = tenant ? tenancyYear(tenant.leaseStart, tenant.leaseEnd) : null;
 
   const members = tenant?.members ?? [];
 
@@ -324,87 +314,80 @@ export default function UnitDetailPage({
 
         {/* Sidebar */}
         <div className="space-y-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-card">
-            <h3 className="mb-4 text-sm font-semibold text-slate-700">
-              Rent Status
-            </h3>
-            {tenant ? (
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Monthly Rent</span>
-                  <span className="font-semibold text-slate-900">
-                    {inr(unit.rent)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Deposit</span>
-                  <span className="font-semibold text-slate-900">
-                    {inr(unit.deposit)}
-                  </span>
-                </div>
-                {latestPayment && (
-                  <div className="border-t border-slate-100 pt-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-500">
-                        {latestPayment.month}
-                      </span>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-sm font-semibold capitalize ${
-                          latestPayment.status === "paid"
-                            ? "bg-green-50 text-green-600"
-                            : latestPayment.status === "overdue"
-                              ? "bg-red-50 text-red-600"
-                              : "bg-amber-50 text-amber-600"
-                        }`}
-                      >
-                        {latestPayment.status}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
+          {tenant ? (
+            <RentHistoryCard tenant={tenant} />
+          ) : (
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-card">
+              <h3 className="mb-4 text-sm font-semibold text-slate-700">
+                Rent History
+              </h3>
               <p className="text-sm text-slate-400">No tenant assigned</p>
-            )}
-          </div>
+            </div>
+          )}
 
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-card">
-            <h3 className="mb-4 text-sm font-semibold text-slate-700">
-              Lease Duration
-            </h3>
-            {tenant ? (
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-slate-700">
+                Lease Duration
+              </h3>
+              {year && (
+                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                  Year {year.year}
+                </span>
+              )}
+            </div>
+
+            {tenant && year ? (
               <div className="space-y-2 text-sm">
                 <div>
-                  <div className="mb-0.5 text-xs text-slate-400">Start Date</div>
+                  <div className="mb-0.5 text-xs text-slate-400">
+                    {year.year > 1 ? "Year started" : "Start Date"}
+                  </div>
                   <div className="font-medium text-slate-800">
-                    {formatDate(tenant.leaseStart)}
+                    {formatDate(year.start)}
                   </div>
                 </div>
                 <div>
-                  <div className="mb-0.5 text-xs text-slate-400">End Date</div>
+                  <div className="mb-0.5 text-xs text-slate-400">
+                    Completes one year on
+                  </div>
                   <div className="font-medium text-slate-800">
-                    {formatDate(tenant.leaseEnd)}
+                    {formatDate(year.end)}
                   </div>
                 </div>
+
                 <div className="border-t border-slate-100 pt-2">
                   <div className="mb-1 text-xs text-slate-400">Progress</div>
                   <div
                     role="progressbar"
-                    aria-valuenow={progress}
+                    aria-valuenow={year.progress}
                     aria-valuemin={0}
                     aria-valuemax={100}
-                    aria-label="Lease progress"
+                    aria-label={`Year ${year.year} progress`}
                     className="h-2 w-full rounded-full bg-slate-100"
                   >
                     <div
-                      className="h-2 rounded-full bg-blue-500"
-                      style={{ width: `${progress}%` }}
+                      className="h-2 rounded-full bg-blue-500 transition-all"
+                      style={{ width: `${year.progress}%` }}
                     />
                   </div>
-                  <div className="mt-1 text-xs text-slate-400">
-                    {progress}% complete
+                  <div className="mt-1 flex justify-between text-xs text-slate-400">
+                    <span>{year.progress}% complete</span>
+                    <span>
+                      {year.daysLeft === 0
+                        ? "Anniversary today"
+                        : `${year.daysLeft} days left`}
+                    </span>
                   </div>
                 </div>
+
+                {/* The agreement can run out before the year does. */}
+                {year.endsBeforeAnniversary && (
+                  <p className="border-t border-slate-100 pt-2 text-xs text-amber-700">
+                    Lease ends {formatDate(tenant.leaseEnd)}, before this year
+                    completes.
+                  </p>
+                )}
               </div>
             ) : (
               <p className="text-sm text-slate-400">No active lease</p>

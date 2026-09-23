@@ -1,4 +1,11 @@
 import { z } from "zod";
+import {
+  checkIdNumber,
+  formatIdNumber,
+  isMobile,
+  formatMobile,
+  nameField,
+} from "@/lib/validation";
 import type { HouseholdMember, IdType, MemberRelation } from "@/types";
 
 /** Relation options offered in the picker, in the order landlords use them. */
@@ -67,15 +74,19 @@ export function draftFromMember(member: HouseholdMember): MemberDraft {
   };
 }
 
-/** Name and relation are required; everything else is a nice-to-have. */
+/**
+ * Name and relation are required; everything else is a nice-to-have. The
+ * optional fields still have to be right when they are filled in — a half-typed
+ * phone number is worse than none at all.
+ */
 const memberSchema = z
   .object({
-    name: z.string().trim().min(2, "Name is required"),
+    name: nameField("Name is required"),
     relation: z.enum(RELATIONS),
-    relationNote: z.string().trim(),
+    relationNote: z.string().trim().max(40, "Keep the relation short"),
     phone: z.string().trim(),
     age: z.string().trim(),
-    occupation: z.string().trim(),
+    occupation: z.string().trim().max(60, "Occupation is too long"),
     idType: z.union([z.enum(MEMBER_ID_TYPES), z.literal("")]),
     idNumber: z.string().trim(),
   })
@@ -87,20 +98,26 @@ const memberSchema = z
         message: "Describe the relation",
       });
     }
-    if (draft.phone && draft.phone.length < 8) {
+
+    if (draft.phone && !isMobile(draft.phone)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["phone"],
-        message: "Enter a valid phone number",
+        message: "Enter a valid 10-digit Indian mobile number",
       });
     }
-    if (draft.age && !/^\d{1,3}$/.test(draft.age)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["age"],
-        message: "Enter a valid age",
-      });
+
+    if (draft.age) {
+      const age = Number(draft.age);
+      if (!/^[0-9]{1,3}$/.test(draft.age) || !Number.isInteger(age) || age > 120) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["age"],
+          message: "Enter an age between 0 and 120",
+        });
+      }
     }
+
     // An ID number without its type would be unreadable on the record.
     if (draft.idNumber && !draft.idType) {
       ctx.addIssue({
@@ -108,6 +125,17 @@ const memberSchema = z
         path: ["idType"],
         message: "Pick the ID type",
       });
+    }
+
+    if (draft.idNumber && draft.idType) {
+      const id = checkIdNumber(draft.idType, draft.idNumber);
+      if (!id.ok) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["idNumber"],
+          message: id.message,
+        });
+      }
     }
   })
   .transform((draft) => {
@@ -117,11 +145,13 @@ const memberSchema = z
     };
     // Blank optionals are dropped rather than stored as empty strings.
     if (draft.relation === "Other") member.relationNote = draft.relationNote;
-    if (draft.phone) member.phone = draft.phone;
+    if (draft.phone) member.phone = formatMobile(draft.phone);
     if (draft.age) member.age = Number(draft.age);
     if (draft.occupation) member.occupation = draft.occupation;
     if (draft.idType) member.idType = draft.idType;
-    if (draft.idNumber) member.idNumber = draft.idNumber;
+    if (draft.idNumber && draft.idType) {
+      member.idNumber = formatIdNumber(draft.idType, draft.idNumber);
+    }
     return member;
   });
 

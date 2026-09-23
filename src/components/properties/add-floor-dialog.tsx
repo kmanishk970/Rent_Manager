@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { textField } from "@/lib/validation";
 import { toast } from "sonner";
 import { Field } from "@/components/form/field";
 import { Input } from "@/components/ui/input";
@@ -22,8 +23,9 @@ const schema = z.object({
   number: z.coerce
     .number()
     .int("Whole numbers only")
-    .min(0, "Floor number can't be negative"),
-  name: z.string().min(2, "Give the floor a name"),
+    .min(0, "Floor number can't be negative")
+    .max(200, "That floor number looks wrong"),
+  name: textField("Floor name"),
 });
 
 type FormValues = z.input<typeof schema>;

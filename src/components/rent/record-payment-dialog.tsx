@@ -23,16 +23,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useRecordPayment, useTenants } from "@/lib/queries";
-import { inr } from "@/lib/format";
+import { useBills, usePayments, useRecordPayment, useTenants } from "@/lib/queries";
+import { inr, monthKey, monthLabel } from "@/lib/format";
+import { buildStatements, summarise } from "@/lib/rent-ledger";
+import { moneyField } from "@/lib/validation";
 import type { PaymentMethod } from "@/types";
 
 const schema = z.object({
   tenantId: z.string().min(1, "Select a tenant"),
-  amount: z.coerce.number().positive("Enter an amount above zero"),
+  // Money is always set against a month — that is what makes a part-payment
+  // legible instead of just a number floating in the ledger.
+  month: z.string().regex(/^[0-9]{4}-[0-9]{2}$/, "Pick the month being paid"),
+  amount: moneyField("an amount"),
   date: z.string().min(1, "Payment date is required"),
   method: z.enum(["Bank Transfer", "Cash", "UPI", "Cheque"]),
-  transactionId: z.string().optional(),
+  transactionId: z.string().trim().max(40, "Transaction ID is too long"),
 });
 
 type FormValues = z.input<typeof schema>;
@@ -47,6 +52,8 @@ export function RecordPaymentDialog({
   defaultTenantId?: string;
 }) {
   const { data: tenants } = useTenants();
+  const { data: bills } = useBills();
+  const { data: payments } = usePayments();
   const recordPayment = useRecordPayment();
 
   const {
@@ -60,6 +67,7 @@ export function RecordPaymentDialog({
     resolver: zodResolver(schema),
     defaultValues: {
       tenantId: defaultTenantId ?? "",
+      month: monthKey(),
       amount: "" as unknown as number,
       date: new Date().toISOString().slice(0, 10),
       method: "Bank Transfer",
@@ -68,15 +76,27 @@ export function RecordPaymentDialog({
   });
 
   const tenantId = watch("tenantId");
+  const month = watch("month");
   const selected = tenants?.find((t) => t.id === tenantId);
 
-  // Pre-fill the amount with the tenant's contracted rent when one is picked,
-  // which is the figure being recorded in the overwhelming majority of cases.
+  // The tenant's ledger, so the dialog can offer the figure that actually
+  // settles them rather than the contracted rent.
+  const statements = buildStatements(
+    (bills ?? []).filter((b) => b.tenantId === tenantId),
+    (payments ?? []).filter((p) => p.tenantId === tenantId),
+  );
+  const summary = summarise(statements);
+  const monthStatement = statements.find((s) => s.month === month);
+
+  // Everything owed to date beats the month's own total: paying that clears
+  // the arrears as well, which is what a landlord collecting late wants.
+  const suggested = summary.outstanding || monthStatement?.total || 0;
+
   useEffect(() => {
-    if (selected) {
-      setValue("amount", selected.rentAmount as unknown as FormValues["amount"]);
+    if (suggested > 0) {
+      setValue("amount", suggested as unknown as FormValues["amount"]);
     }
-  }, [selected, setValue]);
+  }, [suggested, setValue]);
 
   useEffect(() => {
     if (open && defaultTenantId) setValue("tenantId", defaultTenantId);
@@ -86,12 +106,15 @@ export function RecordPaymentDialog({
     const parsed = schema.parse(values);
     await recordPayment.mutateAsync({
       tenantId: parsed.tenantId,
+      month: parsed.month,
       amount: parsed.amount,
       date: parsed.date,
       method: parsed.method,
-      transactionId: parsed.transactionId ?? "",
+      transactionId: parsed.transactionId,
     });
-    toast.success(`Recorded ${inr(parsed.amount)} from ${selected?.name ?? "tenant"}`);
+    toast.success(
+      `Recorded ${inr(parsed.amount)} from ${selected?.name ?? "tenant"} for ${monthLabel(parsed.month)}`,
+    );
     reset();
     onOpenChange(false);
   });
@@ -110,7 +133,8 @@ export function RecordPaymentDialog({
             Record Rent Payment
           </DialogTitle>
           <DialogDescription>
-            Recording a payment clears any outstanding row for that tenant.
+            Money is recorded against a month. Pay less than the month asks and
+            the shortfall carries forward; pay more and the credit does.
           </DialogDescription>
         </DialogHeader>
 
@@ -140,6 +164,56 @@ export function RecordPaymentDialog({
           </Field>
 
           <Field
+            label="For Month"
+            htmlFor="payment-month"
+            error={errors.month?.message}
+          >
+            <Input id="payment-month" type="month" {...register("month")} />
+          </Field>
+
+          {tenantId && monthStatement && (
+            <dl className="space-y-1 rounded-lg bg-slate-50 p-3 text-xs">
+              <div className="flex justify-between">
+                <dt className="text-slate-500">
+                  {monthLabel(monthStatement.month)} charges
+                </dt>
+                <dd className="font-medium text-slate-800">
+                  {inr(monthStatement.total)}
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-slate-500">Already paid</dt>
+                <dd className="font-medium text-slate-800">
+                  {inr(monthStatement.paid)}
+                </dd>
+              </div>
+              {summary.outstanding > 0 && (
+                <div className="flex justify-between border-t border-slate-200 pt-1">
+                  <dt className="font-medium text-red-600">Outstanding to date</dt>
+                  <dd className="font-semibold text-red-600">
+                    {inr(summary.outstanding)}
+                  </dd>
+                </div>
+              )}
+              {summary.advance > 0 && (
+                <div className="flex justify-between border-t border-slate-200 pt-1">
+                  <dt className="font-medium text-green-700">In advance</dt>
+                  <dd className="font-semibold text-green-700">
+                    {inr(summary.advance)}
+                  </dd>
+                </div>
+              )}
+            </dl>
+          )}
+
+          {tenantId && !monthStatement && (
+            <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-700">
+              {monthLabel(month)} has not been billed yet. The payment will be
+              recorded, and will show as credit once the bill is added.
+            </p>
+          )}
+
+          <Field
             label="Amount"
             htmlFor="payment-amount"
             error={errors.amount?.message}
@@ -148,7 +222,7 @@ export function RecordPaymentDialog({
               id="payment-amount"
               type="number"
               inputMode="numeric"
-              placeholder={selected ? String(selected.rentAmount) : "0"}
+              placeholder={suggested ? String(suggested) : "0"}
               aria-invalid={Boolean(errors.amount)}
               {...register("amount")}
             />

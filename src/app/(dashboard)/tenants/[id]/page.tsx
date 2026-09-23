@@ -7,27 +7,10 @@ import { ChevronRight, Mail, MapPin, Phone } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RecordPaymentDialog } from "@/components/rent/record-payment-dialog";
 import { HouseholdMembersCard } from "@/components/tenants/household-members-card";
-import {
-  useDocuments,
-  usePayments,
-  useProperties,
-  useTenant,
-} from "@/lib/queries";
-import { daysUntil, formatDate, inr, leaseProgress } from "@/lib/format";
+import { RentHistoryCard } from "@/components/rent/rent-history-card";
+import { useDocuments, useProperties, useTenant } from "@/lib/queries";
+import { daysUntil, formatDate, inr, tenancyYear } from "@/lib/format";
 import { DOCUMENT_TYPE_ICONS } from "@/lib/documents";
-import type { PaymentStatus } from "@/types";
-
-const STATUS_TONE: Record<PaymentStatus, string> = {
-  paid: "bg-green-100 text-green-700",
-  pending: "bg-amber-100 text-amber-700",
-  overdue: "bg-red-100 text-red-600",
-};
-
-const STATUS_ICON: Record<PaymentStatus, string> = {
-  paid: "✅",
-  pending: "⏳",
-  overdue: "❌",
-};
 
 /** Replaces every character except the last four, keeping spacing intact. */
 function maskId(value: string): string {
@@ -52,7 +35,6 @@ export default function TenantProfilePage({
   const { data: tenant, isPending } = useTenant(id);
   const { data: properties } = useProperties();
   const { data: documents } = useDocuments();
-  const { data: payments } = usePayments();
 
   if (isPending) {
     return (
@@ -88,16 +70,13 @@ export default function TenantProfilePage({
   const unit = floor?.units.find((u) => u.id === tenant.unitId);
 
   const tenantDocs = (documents ?? []).filter((d) => d.tenantId === tenant.id);
-  const rentHistory = (payments ?? [])
-    .filter((p) => p.tenantId === tenant.id)
-    .slice(0, 6);
 
   const left = daysUntil(tenant.leaseEnd);
   const expired = left <= 0;
   const expiring = left > 0 && left <= 60;
-  // Progress across the actual lease term, rather than the fixed 730-day
-  // assumption the prototype used.
-  const progress = leaseProgress(tenant.leaseStart, tenant.leaseEnd);
+  // The twelve months the tenancy is currently in, counted from the lease
+  // start's anniversary rather than across the whole agreement.
+  const year = tenancyYear(tenant.leaseStart, tenant.leaseEnd);
 
   const rentalFacts = [
     { label: "Property", value: property?.name ?? "—" },
@@ -308,80 +287,44 @@ export default function TenantProfilePage({
                 </div>
               </div>
 
-              <div
-                role="progressbar"
-                aria-valuenow={progress}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-label="Lease progress"
-                className="mt-3 h-2 rounded-full bg-blue-100"
-              >
+              {/* Progress through the current twelve months, not the whole
+                  agreement — that bar reads 100% for years on a long lease. */}
+              <div className="mt-3 border-t border-blue-100 pt-3">
+                <div className="mb-1 flex items-center justify-between text-xs">
+                  <span className="font-medium text-blue-900">
+                    Year {year.year} · {formatDate(year.start)} →{" "}
+                    {formatDate(year.end)}
+                  </span>
+                  <span className="text-blue-500">
+                    {year.daysLeft === 0
+                      ? "Anniversary today"
+                      : `${year.daysLeft} days to anniversary`}
+                  </span>
+                </div>
+
                 <div
-                  className="h-2 rounded-full bg-blue-500 transition-all"
-                  style={{ width: `${progress}%` }}
-                />
+                  role="progressbar"
+                  aria-valuenow={year.progress}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label={`Year ${year.year} progress`}
+                  className="h-2 rounded-full bg-blue-100"
+                >
+                  <div
+                    className="h-2 rounded-full bg-blue-500 transition-all"
+                    style={{ width: `${year.progress}%` }}
+                  />
+                </div>
+                <div className="mt-1 text-xs text-blue-500">
+                  {year.progress}% of year {year.year} complete
+                </div>
               </div>
             </div>
           </div>
 
           <HouseholdMembersCard tenant={tenant} />
 
-          {/* Rent history */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-card">
-            <h3 className="font-display mb-4 text-base font-semibold text-slate-900">
-              Rent History
-            </h3>
-
-            {rentHistory.length > 0 ? (
-              <div className="space-y-2.5">
-                {rentHistory.map((payment) => (
-                  <div
-                    key={payment.id}
-                    className="flex items-center gap-4 rounded-lg bg-slate-50 p-3"
-                  >
-                    <div
-                      aria-hidden
-                      className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-sm"
-                    >
-                      {STATUS_ICON[payment.status]}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-slate-800">
-                        {payment.month}
-                      </div>
-                      {payment.transactionId && (
-                        <div className="font-mono text-xs text-slate-400">
-                          {payment.transactionId}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="text-right">
-                      <div className="text-sm font-semibold text-slate-900">
-                        {inr(payment.amount)}
-                      </div>
-                      {payment.method && (
-                        <div className="text-xs text-slate-400">
-                          {payment.method}
-                        </div>
-                      )}
-                    </div>
-
-                    <span
-                      className={`shrink-0 rounded-full px-2 py-1 text-xs font-semibold capitalize ${STATUS_TONE[payment.status]}`}
-                    >
-                      {payment.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="py-4 text-center text-sm text-slate-400">
-                No payment records yet.
-              </p>
-            )}
-          </div>
+          <RentHistoryCard tenant={tenant} />
 
           {/* Documents */}
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-card">

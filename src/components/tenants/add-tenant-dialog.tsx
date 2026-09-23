@@ -27,6 +27,18 @@ import { MemberListEditor } from "@/components/tenants/member-list-editor";
 import { useCreateTenant, useProperties } from "@/lib/queries";
 import { inrK } from "@/lib/format";
 import {
+  checkIdNumber,
+  dateField,
+  emailField,
+  formatIdNumber,
+  idFieldHint,
+  mobileField,
+  moneyField,
+  nameField,
+  pincodeField,
+  textField,
+} from "@/lib/validation";
+import {
   validateMember,
   type MemberDraft,
   type MemberErrors,
@@ -44,34 +56,54 @@ const ID_TYPES = [
 const schema = z
   .object({
     // Step 1 — identity
-    name: z.string().min(2, "Full name is required"),
-    phone: z.string().min(8, "Enter a valid mobile number"),
-    email: z.string().min(1, "Email is required").email("Enter a valid email"),
-    occupation: z.string().min(2, "Occupation is required"),
-    address: z.string().min(3, "Address is required"),
-    city: z.string().min(2, "City is required"),
-    state: z.string().min(2, "State is required"),
-    pincode: z.string().regex(/^\d{6}$/, "Enter a 6-digit PIN code"),
+    name: nameField(),
+    phone: mobileField(),
+    email: emailField(),
+    occupation: textField("Occupation"),
+    address: textField("Address", { min: 5, max: 160 }),
+    city: textField("City"),
+    state: textField("State"),
+    pincode: pincodeField(),
     idType: z.enum(ID_TYPES),
-    idNumber: z.string().min(4, "ID number is required"),
+    idNumber: z.string().trim().min(1, "ID number is required"),
 
     // Step 2 — assignment
     propertyId: z.string().min(1, "Select a property"),
     floorId: z.string().min(1, "Select a floor"),
     unitId: z.string().min(1, "Select a vacant unit"),
-    rentAmount: z.coerce.number().positive("Enter the monthly rent"),
-    deposit: z.coerce.number().nonnegative("Enter the deposit"),
-    leaseStart: z.string().min(1, "Lease start is required"),
-    leaseEnd: z.string().min(1, "Lease end is required"),
+    rentAmount: moneyField("the monthly rent"),
+    deposit: moneyField("the deposit", { min: 0 }),
+    leaseStart: dateField("Lease start"),
+    leaseEnd: dateField("Lease end"),
 
     // Step 4 — emergency contact
-    emergencyContact: z.string().min(2, "Emergency contact name is required"),
-    emergencyPhone: z.string().min(8, "Enter a valid phone number"),
+    emergencyContact: nameField("Emergency contact name is required"),
+    emergencyPhone: mobileField("Emergency contact phone is required"),
   })
-  .refine((data) => data.leaseEnd > data.leaseStart, {
-    message: "Lease end must be after the start date",
-    path: ["leaseEnd"],
-  });
+  .superRefine((data, ctx) => {
+    // An ID number only means anything alongside the type it belongs to.
+    const id = checkIdNumber(data.idType, data.idNumber);
+    if (!id.ok) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["idNumber"],
+        message: id.message,
+      });
+    }
+
+    if (data.leaseEnd <= data.leaseStart) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["leaseEnd"],
+        message: "Lease end must be after the start date",
+      });
+    }
+  })
+  // Stored the way the issuing authority prints it.
+  .transform((data) => ({
+    ...data,
+    idNumber: formatIdNumber(data.idType, data.idNumber),
+  }));
 
 type FormValues = z.input<typeof schema>;
 
@@ -151,7 +183,15 @@ function StepOne({ form }: { form: UseFormReturn<FormValues> }) {
         </Field>
 
         <Field label="Mobile Number" htmlFor="t-phone" error={errors.phone?.message}>
-          <Input id="t-phone" placeholder="+91 98765 43210" {...register("phone")} />
+          <Input
+            id="t-phone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            maxLength={18}
+            placeholder="+91 98765 43210"
+            {...register("phone")}
+          />
         </Field>
 
         <Field label="Email Address" htmlFor="t-email" error={errors.email?.message}>
@@ -163,7 +203,14 @@ function StepOne({ form }: { form: UseFormReturn<FormValues> }) {
         </Field>
 
         <Field label="PIN Code" htmlFor="t-pincode" error={errors.pincode?.message}>
-          <Input id="t-pincode" inputMode="numeric" placeholder="560001" {...register("pincode")} />
+          <Input
+            id="t-pincode"
+            inputMode="numeric"
+            autoComplete="postal-code"
+            maxLength={6}
+            placeholder="560001"
+            {...register("pincode")}
+          />
         </Field>
 
         <Field
@@ -186,7 +233,10 @@ function StepOne({ form }: { form: UseFormReturn<FormValues> }) {
         <Field label="ID Type" htmlFor="t-idtype">
           <Select
             value={watch("idType")}
-            onValueChange={(value) => setValue("idType", value as IdType)}
+            onValueChange={(value) => {
+              setValue("idType", value as IdType);
+              if (form.getValues("idNumber")) form.trigger("idNumber");
+            }}
           >
             <SelectTrigger id="t-idtype" className="w-full">
               <SelectValue />
@@ -202,7 +252,12 @@ function StepOne({ form }: { form: UseFormReturn<FormValues> }) {
         </Field>
 
         <Field label="ID Number" htmlFor="t-idnumber" error={errors.idNumber?.message}>
-          <Input id="t-idnumber" placeholder="2345 6789 0123" {...register("idNumber")} />
+          <Input
+            id="t-idnumber"
+            autoComplete="off"
+            {...idFieldHint(watch("idType"))}
+            {...register("idNumber")}
+          />
         </Field>
       </div>
     </div>

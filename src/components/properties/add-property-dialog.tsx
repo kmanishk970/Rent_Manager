@@ -3,6 +3,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { nameField, textField } from "@/lib/validation";
 import { toast } from "sonner";
 import { Field } from "@/components/form/field";
 import { Input } from "@/components/ui/input";
@@ -25,9 +26,9 @@ import {
 import { useCreateProperty } from "@/lib/queries";
 
 const schema = z.object({
-  name: z.string().min(2, "Property name is required"),
-  location: z.string().min(2, "Location is required"),
-  address: z.string().min(5, "Enter the full address"),
+  name: nameField("Property name is required"),
+  location: textField("Location"),
+  address: textField("Address", { min: 5, max: 160 }),
   type: z.enum(["Residential", "Commercial", "Mixed"]),
 });
 

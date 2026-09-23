@@ -5,12 +5,13 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { emailField } from "@/lib/validation";
 import { Lock } from "lucide-react";
 import { Field } from "@/components/form/field";
 import { Input } from "@/components/ui/input";
 
 const schema = z.object({
-  email: z.string().min(1, "Email is required").email("Enter a valid email"),
+  email: emailField(),
 });
 
 type FormValues = z.infer<typeof schema>;

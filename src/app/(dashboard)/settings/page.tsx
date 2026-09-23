@@ -6,6 +6,7 @@ import { useQueryState } from "nuqs";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { emailField, mobileField, nameField, passwordField } from "@/lib/validation";
 import { toast } from "sonner";
 import { Field } from "@/components/form/field";
 import { Input } from "@/components/ui/input";
@@ -39,9 +40,9 @@ const PLANS = [
 ];
 
 const profileSchema = z.object({
-  name: z.string().min(2, "Full name is required"),
-  email: z.string().min(1, "Email is required").email("Enter a valid email"),
-  phone: z.string().min(8, "Enter a valid phone number"),
+  name: nameField(),
+  email: emailField(),
+  phone: mobileField(),
   company: z.string().optional(),
   address: z.string().optional(),
 });
@@ -51,10 +52,7 @@ type ProfileValues = z.infer<typeof profileSchema>;
 const passwordSchema = z
   .object({
     current: z.string().min(1, "Enter your current password"),
-    next: z
-      .string()
-      .min(8, "Use at least 8 characters")
-      .regex(/[0-9]/, "Include at least one number"),
+    next: passwordField(),
     confirm: z.string().min(1, "Confirm your new password"),
   })
   .refine((data) => data.next === data.confirm, {

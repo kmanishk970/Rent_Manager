@@ -17,17 +17,25 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RecordPaymentDialog } from "@/components/rent/record-payment-dialog";
 import { GlowCard } from "@/components/ui/glow-card";
-import { usePayments, useTenants } from "@/lib/queries";
-import { expandMonth, formatDate, inr, inrK } from "@/lib/format";
-import type { PaymentStatus } from "@/types";
+import { useBills, usePayments, useProperties, useTenants } from "@/lib/queries";
+import { formatDate, inr, inrK, monthLabel, monthLong } from "@/lib/format";
+import {
+  STATUS_LABEL,
+  STATUS_TONE,
+  buildStatements,
+  type MonthlyStatement,
+} from "@/lib/rent-ledger";
+import type { PaymentStatus, Tenant } from "@/types";
 
-const STATUS_TONE: Record<PaymentStatus, string> = {
-  paid: "bg-green-100 text-green-700",
-  pending: "bg-amber-100 text-amber-700",
-  overdue: "bg-red-100 text-red-600",
-};
+const FILTERS = ["all", "paid", "partial", "pending", "overdue"] as const;
 
-const FILTERS = ["all", "paid", "pending", "overdue"] as const;
+/** One tenant's month, flattened for the table. */
+interface LedgerRow {
+  key: string;
+  tenant: Tenant;
+  propertyName: string;
+  statement: MonthlyStatement;
+}
 
 export default function RentPage() {
   const [search, setSearch] = useQueryState("q", {
@@ -46,9 +54,11 @@ export default function RentPage() {
   const [showDialog, setShowDialog] = useState(false);
 
   const { data: payments, isPending } = usePayments();
+  const { data: bills, isPending: billsPending } = useBills();
   const { data: tenants } = useTenants();
+  const { data: properties } = useProperties();
 
-  if (isPending || !payments) {
+  if (isPending || billsPending || !payments || !bills || !tenants) {
     return (
       <div className="space-y-5">
         <Skeleton className="h-14 w-72" />
@@ -62,39 +72,65 @@ export default function RentPage() {
     );
   }
 
+  // The table lists months, not transactions: a month is what carries a
+  // status, since it can be part-paid by several transactions or none at all.
+  const rows: LedgerRow[] = tenants
+    .flatMap((tenant) => {
+      const property = properties?.find((prop) => prop.id === tenant.propertyId);
+      return buildStatements(
+        bills.filter((b) => b.tenantId === tenant.id),
+        payments.filter((pay) => pay.tenantId === tenant.id),
+      ).map((statement) => ({
+        key: `${tenant.id}-${statement.month}`,
+        tenant,
+        propertyName: property?.name ?? "",
+        statement,
+      }));
+    })
+    // Newest month first, tenants alphabetical within it.
+    .sort(
+      (a, b) =>
+        b.statement.month.localeCompare(a.statement.month) ||
+        a.tenant.name.localeCompare(b.tenant.name),
+    );
+
   const term = search.trim().toLowerCase();
-  const filtered = payments.filter((p) => {
-    const matchesFilter = filter === "all" || p.status === filter;
+  const filtered = rows.filter((row) => {
+    const matchesFilter = filter === "all" || row.statement.status === filter;
     const matchesSearch =
-      p.tenantName.toLowerCase().includes(term) ||
-      p.propertyName.toLowerCase().includes(term);
+      row.tenant.name.toLowerCase().includes(term) ||
+      row.propertyName.toLowerCase().includes(term);
     return matchesFilter && matchesSearch;
   });
 
   const sumBy = (status?: PaymentStatus) =>
-    payments
-      .filter((p) => !status || p.status === status)
-      .reduce((sum, p) => sum + p.amount, 0);
+    rows
+      .filter((r) => !status || r.statement.status === status)
+      .reduce(
+        (sum, r) => sum + (status ? r.statement.shortfall : r.statement.total),
+        0,
+      );
 
   const countBy = (status?: PaymentStatus) =>
-    payments.filter((p) => !status || p.status === status).length;
+    rows.filter((r) => !status || r.statement.status === status).length;
 
   const total = sumBy();
-  const collected = sumBy("paid");
-  const pending = sumBy("pending");
+  const collected = rows.reduce((sum, r) => sum + r.statement.paid, 0);
+  // What is still owed, split by how late it is.
+  const pending = sumBy("pending") + sumBy("partial");
   const overdue = sumBy("overdue");
 
   const pct = (value: number) => (total ? (value / total) * 100 : 0);
 
-  const period = payments[0]?.month ? expandMonth(payments[0].month) : "";
+  const period = rows[0] ? monthLong(rows[0].statement.month) : "";
 
   // Drawn icons rather than emoji: emoji render in the OS colour font, so they
   // sit at a different weight and baseline from everything around them and are
   // the fastest way to make an interface look unfinished.
   const summary = [
-    { label: "Expected Rent", value: total, count: countBy(), tile: "bg-blue-50", tint: "text-blue-600", text: "text-slate-900", Icon: Landmark },
+    { label: "Billed", value: total, count: countBy(), tile: "bg-blue-50", tint: "text-blue-600", text: "text-slate-900", Icon: Landmark },
     { label: "Collected", value: collected, count: countBy("paid"), tile: "bg-green-50", tint: "text-green-600", text: "text-green-700", Icon: CheckCircle2 },
-    { label: "Pending", value: pending, count: countBy("pending"), tile: "bg-amber-50", tint: "text-amber-600", text: "text-amber-700", Icon: Clock },
+    { label: "Pending", value: pending, count: countBy("pending") + countBy("partial"), tile: "bg-amber-50", tint: "text-amber-600", text: "text-amber-700", Icon: Clock },
     { label: "Overdue", value: overdue, count: countBy("overdue"), tile: "bg-red-50", tint: "text-red-600", text: "text-red-600", Icon: AlertTriangle },
   ];
 
@@ -113,7 +149,7 @@ export default function RentPage() {
           </h2>
           <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">
             {period && `${period} · `}
-            {payments.length} transactions
+            {rows.length} billed month{rows.length === 1 ? "" : "s"}
           </p>
         </div>
 
@@ -278,7 +314,7 @@ export default function RentPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
-                {["Tenant", "Property & Unit", "Amount", "Date", "Method", "Status"].map(
+                {["Tenant", "Property", "Charges", "Paid", "Balance", "Status"].map(
                   (heading) => (
                     <th
                       key={heading}
@@ -296,75 +332,88 @@ export default function RentPage() {
             </thead>
 
             <tbody className="divide-y divide-slate-100">
-              {filtered.map((payment) => {
-                const tenant = tenants?.find((t) => t.id === payment.tenantId);
+              {filtered.map(({ key, tenant, propertyName, statement }) => (
+                <tr key={key} className="transition-colors hover:bg-slate-50">
+                  <td className="px-5 py-4">
+                    <div className="flex items-center gap-3">
+                      <Image
+                        src={tenant.photo}
+                        alt=""
+                        width={32}
+                        height={32}
+                        className="size-8 shrink-0 rounded-lg bg-slate-100 object-cover"
+                        unoptimized
+                      />
+                      <div>
+                        <div className="text-sm font-medium text-slate-900">
+                          {tenant.name}
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          {monthLabel(statement.month)}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
 
-                return (
-                  <tr
-                    key={payment.id}
-                    className="transition-colors hover:bg-slate-50"
-                  >
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        {tenant && (
-                          <Image
-                            src={tenant.photo}
-                            alt=""
-                            width={32}
-                            height={32}
-                            className="size-8 shrink-0 rounded-lg bg-slate-100 object-cover"
-                            unoptimized
-                          />
-                        )}
-                        <div>
-                          <div className="text-sm font-medium text-slate-900">
-                            {payment.tenantName}
-                          </div>
-                          <div className="text-xs text-slate-400">
-                            {payment.month}
-                          </div>
-                        </div>
+                  <td className="px-4 py-4 text-sm text-slate-700">
+                    {propertyName}
+                  </td>
+
+                  {/* rent + electricity = total, the breakdown kept visible */}
+                  <td className="px-4 py-4">
+                    <div className="text-sm font-semibold text-slate-900">
+                      {inr(statement.total)}
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      {inr(statement.rent)} + {inr(statement.electricity)}
+                      {statement.other > 0 && ` + ${inr(statement.other)}`}
+                    </div>
+                  </td>
+
+                  <td className="px-4 py-4">
+                    <div className="text-sm text-slate-700">
+                      {inr(statement.paid)}
+                    </div>
+                    {statement.payments.length > 0 && (
+                      <div className="text-xs text-slate-400">
+                        {formatDate(statement.payments.at(-1)?.date)}
                       </div>
-                    </td>
-                    <td className="px-4 py-4 text-sm text-slate-700">
-                      {payment.propertyName}
-                    </td>
-                    <td className="px-4 py-4 text-sm font-semibold text-slate-900">
-                      {inr(payment.amount)}
-                    </td>
-                    <td className="px-4 py-4 text-sm text-slate-600">
-                      {formatDate(payment.date)}
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="text-sm text-slate-600">
-                        {payment.method || "—"}
-                      </div>
-                      {payment.transactionId && (
-                        <div className="font-mono text-xs text-slate-400">
-                          {payment.transactionId}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-4">
-                      <span
-                        className={`rounded-full px-2 py-1 text-xs font-semibold capitalize ${STATUS_TONE[payment.status]}`}
-                      >
-                        {payment.status}
+                    )}
+                  </td>
+
+                  {/* What the month left behind, in the tenant's favour or not */}
+                  <td className="px-4 py-4">
+                    {statement.shortfall > 0 ? (
+                      <span className="text-sm font-semibold text-red-600">
+                        −{inr(statement.shortfall)}
                       </span>
-                    </td>
-                    <td className="px-4 py-4">
-                      {tenant && (
-                        <Link
-                          href={`/tenants/${tenant.id}`}
-                          className="text-xs font-medium text-blue-600 hover:underline"
-                        >
-                          View →
-                        </Link>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                    ) : statement.credit > 0 ? (
+                      <span className="text-sm font-semibold text-green-700">
+                        +{inr(statement.credit)}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-slate-400">—</span>
+                    )}
+                  </td>
+
+                  <td className="px-4 py-4">
+                    <span
+                      className={`rounded-full px-2 py-1 text-xs font-semibold ${STATUS_TONE[statement.status]}`}
+                    >
+                      {STATUS_LABEL[statement.status]}
+                    </span>
+                  </td>
+
+                  <td className="px-4 py-4">
+                    <Link
+                      href={`/tenants/${tenant.id}`}
+                      className="text-xs font-medium text-blue-600 hover:underline"
+                    >
+                      View →
+                    </Link>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

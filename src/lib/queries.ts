@@ -17,6 +17,7 @@ export const qk = {
   unit: (id: string) => ["units", id] as const,
   tenants: ["tenants"] as const,
   tenant: (id: string) => ["tenants", id] as const,
+  bills: ["bills"] as const,
   payments: ["payments"] as const,
   documents: ["documents"] as const,
   notifications: ["notifications"] as const,
@@ -61,6 +62,10 @@ export function useTenant(id: string) {
 
 export function usePayments() {
   return useQuery({ queryKey: qk.payments, queryFn: api.listPayments });
+}
+
+export function useBills() {
+  return useQuery({ queryKey: qk.bills, queryFn: api.listBills });
 }
 
 export function useDocuments() {
@@ -185,6 +190,26 @@ export function useRecordPayment() {
     mutationFn: api.recordPayment,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.payments });
+    },
+  });
+}
+
+export function useCreateBill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.createBill,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.bills });
+    },
+  });
+}
+
+export function useDeleteBill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.deleteBill,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.bills });
     },
   });
 }

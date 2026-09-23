@@ -17,6 +17,42 @@ import {
 } from "@/lib/rent-ledger";
 import type { RentBill, Tenant } from "@/types";
 
+/** One figure in the charge breakdown, with the name of what it is. */
+function Term({
+  label,
+  value,
+  emphasis = false,
+}: {
+  label: string;
+  value: number;
+  emphasis?: boolean;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="truncate text-[10px] font-medium tracking-wide text-slate-400 uppercase">
+        {label}
+      </div>
+      <div
+        className={
+          emphasis
+            ? "text-sm font-bold text-slate-900"
+            : "text-xs font-semibold text-slate-700"
+        }
+      >
+        {inr(value)}
+      </div>
+    </div>
+  );
+}
+
+function Operator({ children }: { children: string }) {
+  return (
+    <span aria-hidden className="pb-0.5 text-xs text-slate-400">
+      {children}
+    </span>
+  );
+}
+
 /**
  * One month's line: what was charged, what arrived, and what it left behind.
  *
@@ -50,23 +86,22 @@ function StatementRow({
         </span>
       </div>
 
-      {/* rent + electricity ( + other ) = total */}
-      <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-xs text-slate-500">
-        <span title="Rent">{inr(rent)}</span>
-        <span aria-hidden>+</span>
-        <span title="Electricity">{inr(electricity)}</span>
+      {/* rent + electricity ( + other ) = total, every figure named */}
+      <div className="flex flex-wrap items-end gap-x-2 gap-y-1.5">
+        <Term label="Rent" value={rent} />
+        <Operator>+</Operator>
+        <Term label="Electricity" value={electricity} />
         {other > 0 && (
           <>
-            <span aria-hidden>+</span>
-            <span title={statement.bill.otherLabel || "Other charges"}>
-              {inr(other)}
-            </span>
+            <Operator>+</Operator>
+            <Term
+              label={statement.bill.otherLabel || "Other"}
+              value={other}
+            />
           </>
         )}
-        <span aria-hidden>=</span>
-        <span className="text-sm font-semibold text-slate-900">
-          {inr(total)}
-        </span>
+        <Operator>=</Operator>
+        <Term label="Total" value={total} emphasis />
       </div>
 
       <dl className="mt-2 space-y-1 border-t border-slate-200 pt-2 text-xs">

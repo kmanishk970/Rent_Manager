@@ -359,14 +359,16 @@ export default function RentPage() {
                     {propertyName}
                   </td>
 
-                  {/* rent + electricity = total, the breakdown kept visible */}
+                  {/* The total, over a breakdown that names each part */}
                   <td className="px-4 py-4">
                     <div className="text-sm font-semibold text-slate-900">
                       {inr(statement.total)}
                     </div>
                     <div className="text-xs text-slate-400">
-                      {inr(statement.rent)} + {inr(statement.electricity)}
-                      {statement.other > 0 && ` + ${inr(statement.other)}`}
+                      Rent {inr(statement.rent)} · Electricity{" "}
+                      {inr(statement.electricity)}
+                      {statement.other > 0 &&
+                        ` · ${statement.bill.otherLabel || "Other"} ${inr(statement.other)}`}
                     </div>
                   </td>
 

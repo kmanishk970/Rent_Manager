@@ -123,6 +123,43 @@ export async function getUnit(id: string): Promise<Unit | null> {
   return data ? toUnit(data) : null;
 }
 
+export interface UpdateUnitInput {
+  id: string;
+  number?: string;
+  rent?: number;
+  deposit?: number;
+  underMaintenance?: boolean;
+}
+
+export async function updateUnit(input: UpdateUnitInput): Promise<Unit> {
+  const { id, ...patch } = input;
+  const { data } = await http.patch<ApiUnit>(`/units/${id}`, {
+    number: patch.number,
+    defaultRent: patch.rent?.toFixed(2),
+    defaultDeposit: patch.deposit?.toFixed(2),
+    underMaintenance: patch.underMaintenance,
+  });
+  return toUnit(data);
+}
+
+/**
+ * Removing a unit is refused by the database while a lease still references
+ * it, which is the answer you want: deleting a unit should never quietly take
+ * a tenancy and its rent history with it.
+ */
+export async function deleteUnit(id: string): Promise<{ id: string }> {
+  await http.delete(`/units/${id}`);
+  return { id };
+}
+
+export async function deleteFloor(input: {
+  propertyId: string;
+  floorId: string;
+}): Promise<{ id: string }> {
+  await http.delete(`/properties/${input.propertyId}/floors/${input.floorId}`);
+  return { id: input.floorId };
+}
+
 /* ------------------------------------------------------------------ */
 /* Tenancies                                                           */
 /* ------------------------------------------------------------------ */

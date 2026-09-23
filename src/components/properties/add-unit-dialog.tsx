@@ -17,8 +17,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useCreateUnit } from "@/lib/queries";
+import { useCreateUnit, useUpdateUnit } from "@/lib/queries";
 import { inr } from "@/lib/format";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import type { Unit } from "@/types";
 
 const schema = z.object({
   number: z
@@ -29,10 +32,19 @@ const schema = z.object({
     .regex(/^[A-Za-z0-9-]+$/, "Letters, numbers and hyphens only"),
   rent: moneyField("the monthly rent"),
   deposit: moneyField("the deposit", { min: 0 }),
+  // Occupancy is derived from leases; maintenance is the one status a unit
+  // actually carries, so it is the one this form can set.
+  underMaintenance: z.boolean(),
 });
 
 type FormValues = z.input<typeof schema>;
 
+/**
+ * Adds a unit, or edits one when `unit` is supplied.
+ *
+ * One dialog for both, because the fields are identical — a second component
+ * would be the same form twice, drifting apart at the first change.
+ */
 export function AddUnitDialog({
   open,
   onOpenChange,
@@ -40,6 +52,7 @@ export function AddUnitDialog({
   floorId,
   floorName,
   suggestedNumber,
+  unit,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -47,8 +60,13 @@ export function AddUnitDialog({
   floorId: string;
   floorName: string;
   suggestedNumber: string;
+  /** Omit to add; pass a unit to edit it. */
+  unit?: Unit;
 }) {
   const createUnit = useCreateUnit();
+  const updateUnit = useUpdateUnit();
+  const editing = Boolean(unit);
+  const pending = createUnit.isPending || updateUnit.isPending;
 
   const {
     register,
@@ -63,6 +81,7 @@ export function AddUnitDialog({
       number: suggestedNumber,
       rent: "" as unknown as number,
       deposit: "" as unknown as number,
+      underMaintenance: false,
     },
   });
 
@@ -73,25 +92,32 @@ export function AddUnitDialog({
   useEffect(() => {
     const value = Number(rent);
     const currentDeposit = watch("deposit");
-    if (Number.isFinite(value) && value > 0 && !currentDeposit) {
+    if (!editing && Number.isFinite(value) && value > 0 && !currentDeposit) {
       setValue("deposit", (value * 3) as unknown as FormValues["deposit"]);
     }
-  }, [rent, setValue, watch]);
+  }, [rent, editing, setValue, watch]);
 
   useEffect(() => {
-    if (open) {
-      reset({
-        number: suggestedNumber,
-        rent: "" as unknown as number,
-        deposit: "" as unknown as number,
-      });
-    }
-  }, [open, suggestedNumber, reset]);
+    if (!open) return;
+    reset({
+      number: unit?.number ?? suggestedNumber,
+      rent: (unit?.rent ?? "") as unknown as number,
+      deposit: (unit?.deposit ?? "") as unknown as number,
+      underMaintenance: unit?.status === "maintenance",
+    });
+  }, [open, suggestedNumber, unit, reset]);
 
   const onSubmit = handleSubmit(async (values) => {
     const parsed = schema.parse(values);
-    await createUnit.mutateAsync({ propertyId, floorId, ...parsed });
-    toast.success(`Unit ${parsed.number} added to ${floorName}`);
+
+    if (unit) {
+      await updateUnit.mutateAsync({ id: unit.id, ...parsed });
+      toast.success(`Unit ${parsed.number} updated`);
+    } else {
+      await createUnit.mutateAsync({ propertyId, floorId, ...parsed });
+      toast.success(`Unit ${parsed.number} added to ${floorName}`);
+    }
+
     onOpenChange(false);
   });
 
@@ -102,11 +128,12 @@ export function AddUnitDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display text-lg font-semibold">
-            Add Unit
+            {editing ? `Edit Unit ${unit?.number}` : "Add Unit"}
           </DialogTitle>
           <DialogDescription>
-            Adding to {floorName}. New units start vacant — assigning a tenant is
-            what marks one occupied.
+            {editing
+              ? "Rent and deposit here are what a new tenancy is offered. An existing lease keeps the figures it was agreed at."
+              : `Adding to ${floorName}. New units start vacant — assigning a tenant is what marks one occupied.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -149,6 +176,22 @@ export function AddUnitDialog({
             </Field>
           </div>
 
+          <div className="flex items-center justify-between rounded-xl border border-slate-200 p-3">
+            <div>
+              <Label htmlFor="unit-maintenance" className="text-sm font-medium text-slate-700">
+                Under maintenance
+              </Label>
+              <p className="mt-0.5 text-xs text-slate-400">
+                Takes the unit out of circulation without ending any lease.
+              </p>
+            </div>
+            <Switch
+              id="unit-maintenance"
+              checked={watch("underMaintenance")}
+              onCheckedChange={(checked) => setValue("underMaintenance", checked)}
+            />
+          </div>
+
           {depositPreview > 0 && (
             <p className="text-xs text-slate-500">
               Deposit set to {inr(depositPreview)}.
@@ -163,8 +206,12 @@ export function AddUnitDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={createUnit.isPending}>
-              {createUnit.isPending ? "Adding…" : "Add Unit"}
+            <Button type="submit" disabled={pending}>
+              {pending
+                ? "Saving…"
+                : editing
+                  ? "Save Changes"
+                  : "Add Unit"}
             </Button>
           </DialogFooter>
         </form>

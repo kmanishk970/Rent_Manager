@@ -3,14 +3,24 @@
 import { useState, use } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronRight, MapPin, Plus } from "lucide-react";
+import { ChevronRight, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { AddFloorDialog } from "@/components/properties/add-floor-dialog";
 import { AddUnitDialog } from "@/components/properties/add-unit-dialog";
-import { useProperty, useTenants } from "@/lib/queries";
+import { useDeleteUnit, useProperty, useTenants } from "@/lib/queries";
 import { inrK } from "@/lib/format";
-import type { UnitStatus } from "@/types";
+import { toast } from "sonner";
+import { apiErrorMessage } from "@/lib/api/http";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import type { Unit, UnitStatus } from "@/types";
 
 const STATUS_CARD: Record<UnitStatus, string> = {
   occupied: "bg-green-100 text-green-700 border-green-200",
@@ -37,6 +47,10 @@ export default function PropertyDetailPage({
   // Which floor's "Add Unit" dialog is open, by floor id — one piece of state
   // rather than a boolean per floor.
   const [addUnitFloorId, setAddUnitFloorId] = useState<string | null>(null);
+  // The unit being edited, and the one awaiting a delete confirmation.
+  const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
+  const [confirmingUnit, setConfirmingUnit] = useState<Unit | null>(null);
+  const deleteUnit = useDeleteUnit();
 
   if (isPending) {
     return (
@@ -71,6 +85,23 @@ export default function PropertyDetailPage({
 
   const addUnitFloor =
     property.floors.find((f) => f.id === addUnitFloorId) ?? null;
+  const editingFloor = editingUnit
+    ? (property.floors.find((f) => f.id === editingUnit.floorId) ?? null)
+    : null;
+
+  const confirmDelete = async () => {
+    if (!confirmingUnit) return;
+    try {
+      await deleteUnit.mutateAsync(confirmingUnit.id);
+      toast.success(`Unit ${confirmingUnit.number} deleted`);
+      setConfirmingUnit(null);
+    } catch (error) {
+      // The database refuses while a lease still points at the unit, which is
+      // the right answer — deleting a unit must not take a tenancy and its
+      // rent history with it. Show what it said rather than a generic failure.
+      toast.error(apiErrorMessage(error, "Could not delete that unit"));
+    }
+  };
 
   const summary = [
     { label: "Total Units", value: String(allUnits.length), tone: "text-slate-900" },
@@ -234,10 +265,33 @@ export default function PropertyDetailPage({
                   : null;
 
                 return (
+                  <div key={unit.id} className="group/unit relative">
+                    {/* The actions cannot live inside the Link — a button
+                        nested in an anchor is invalid and swallows the click. */}
+                    <div className="absolute top-1.5 right-1.5 z-10 flex gap-0.5 opacity-0 transition-opacity group-hover/unit:opacity-100 focus-within:opacity-100">
+                      <button
+                        type="button"
+                        onClick={() => setEditingUnit(unit)}
+                        aria-label={`Edit unit ${unit.number}`}
+                        title="Edit unit"
+                        className="rounded-md bg-white/90 p-1 text-slate-500 shadow-sm ring-1 ring-slate-200 transition-colors hover:text-blue-600"
+                      >
+                        <Pencil className="size-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmingUnit(unit)}
+                        aria-label={`Delete unit ${unit.number}`}
+                        title="Delete unit"
+                        className="rounded-md bg-white/90 p-1 text-slate-500 shadow-sm ring-1 ring-slate-200 transition-colors hover:text-red-600"
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                    </div>
+
                   <Link
-                    key={unit.id}
                     href={`/units/${unit.id}`}
-                    className={`relative rounded-xl border p-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-card-hover ${STATUS_CARD[unit.status]}`}
+                    className={`relative block rounded-xl border p-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-card-hover ${STATUS_CARD[unit.status]}`}
                   >
                     <div className="mb-2 flex items-center justify-between">
                       <span className="font-mono text-base font-bold">
@@ -268,6 +322,7 @@ export default function PropertyDetailPage({
                       </div>
                     )}
                   </Link>
+                  </div>
                 );
               })}
             </div>
@@ -296,6 +351,54 @@ export default function PropertyDetailPage({
           suggestedNumber={`${addUnitFloor.number}0${addUnitFloor.units.length + 1}`}
         />
       )}
+
+      {editingUnit && (
+        <AddUnitDialog
+          open
+          onOpenChange={(open) => !open && setEditingUnit(null)}
+          propertyId={property.id}
+          floorId={editingUnit.floorId}
+          floorName={editingFloor?.name ?? ""}
+          suggestedNumber={editingUnit.number}
+          unit={editingUnit}
+        />
+      )}
+
+      <Dialog
+        open={Boolean(confirmingUnit)}
+        onOpenChange={(open) => !open && setConfirmingUnit(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display text-lg font-semibold text-slate-900">
+              Delete unit {confirmingUnit?.number}?
+            </DialogTitle>
+            <DialogDescription>
+              {confirmingUnit?.status === "occupied"
+                ? "This unit is occupied. Its tenancy has to be ended before the unit can be removed."
+                : "This cannot be undone. Meter readings taken on this unit go with it."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirmingUnit(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={deleteUnit.isPending}
+            >
+              {deleteUnit.isPending ? "Deleting…" : "Delete unit"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -125,6 +125,40 @@ export function useCreateUnit() {
   });
 }
 
+export function useUpdateUnit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.updateUnit,
+    onSuccess: (unit) => {
+      qc.setQueryData(qk.unit(unit.id), unit);
+      qc.invalidateQueries({ queryKey: qk.properties });
+      qc.invalidateQueries({ queryKey: qk.units });
+    },
+  });
+}
+
+export function useDeleteUnit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.deleteUnit,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.properties });
+      qc.invalidateQueries({ queryKey: qk.units });
+    },
+  });
+}
+
+export function useDeleteFloor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.deleteFloor,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.properties });
+      qc.invalidateQueries({ queryKey: qk.units });
+    },
+  });
+}
+
 export function useCreateTenant() {
   const qc = useQueryClient();
   return useMutation({

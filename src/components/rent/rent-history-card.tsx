@@ -7,6 +7,7 @@ import { RecordPaymentDialog } from "@/components/rent/record-payment-dialog";
 import { useBills, usePayments } from "@/lib/queries";
 import { Skeleton } from "@/components/ui/skeleton";
 import { inr, monthLabel } from "@/lib/format";
+import { meterWorking, readingGapFor } from "@/lib/electricity";
 import {
   STATUS_LABEL,
   STATUS_TONE,
@@ -21,10 +22,13 @@ import type { RentBill, Tenant } from "@/types";
 function Term({
   label,
   value,
+  note,
   emphasis = false,
 }: {
   label: string;
   value: number;
+  /** The working behind the figure, e.g. "200 units × ₹10". */
+  note?: string | null;
   emphasis?: boolean;
 }) {
   return (
@@ -41,6 +45,9 @@ function Term({
       >
         {inr(value)}
       </div>
+      {note && (
+        <div className="truncate text-[10px] text-slate-400">{note}</div>
+      )}
     </div>
   );
 }
@@ -61,13 +68,17 @@ function Operator({ children }: { children: string }) {
  */
 function StatementRow({
   statement,
+  bills,
   onEdit,
 }: {
   statement: MonthlyStatement;
+  /** Every bill for the unit, so a broken reading chain can be spotted. */
+  bills: RentBill[];
   onEdit: (bill: RentBill) => void;
 }) {
   const { rent, electricity, other, total, paid, opening, shortfall, credit } =
     statement;
+  const gap = readingGapFor(bills, statement.bill);
 
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -90,7 +101,11 @@ function StatementRow({
       <div className="flex flex-wrap items-end gap-x-2 gap-y-1.5">
         <Term label="Rent" value={rent} />
         <Operator>+</Operator>
-        <Term label="Electricity" value={electricity} />
+        <Term
+          label="Electricity"
+          value={electricity}
+          note={meterWorking(statement.bill)}
+        />
         {other > 0 && (
           <>
             <Operator>+</Operator>
@@ -103,6 +118,16 @@ function StatementRow({
         <Operator>=</Operator>
         <Term label="Total" value={total} emphasis />
       </div>
+
+      {/* Correcting an older reading leaves later bills alone by design, so
+          the break it causes is surfaced rather than silently reconciled. */}
+      {gap && (
+        <p className="mt-2 rounded bg-amber-50 px-2 py-1 text-[11px] text-amber-700">
+          Opens at {gap.recorded.toLocaleString("en-IN")}, but{" "}
+          {monthLabel(gap.month)} now closes at{" "}
+          {gap.expected.toLocaleString("en-IN")}.
+        </p>
+      )}
 
       <dl className="mt-2 space-y-1 border-t border-slate-200 pt-2 text-xs">
         {opening !== 0 && (
@@ -158,6 +183,9 @@ export function RentHistoryCard({ tenant }: { tenant: Tenant }) {
   if (billsPending || paymentsPending) {
     return <Skeleton className="h-64 rounded-xl" />;
   }
+
+  // Readings follow the unit's meter, which outlives any one tenancy.
+  const unitBills = (bills ?? []).filter((b) => b.unitId === tenant.unitId);
 
   const statements = buildStatements(
     (bills ?? []).filter((b) => b.tenantId === tenant.id),
@@ -257,6 +285,7 @@ export function RentHistoryCard({ tenant }: { tenant: Tenant }) {
               <StatementRow
                 key={statement.month}
                 statement={statement}
+                bills={unitBills}
                 onEdit={openEdit}
               />
             ))}

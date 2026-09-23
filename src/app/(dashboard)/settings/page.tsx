@@ -44,6 +44,11 @@ const profileSchema = z.object({
   email: emailField(),
   phone: mobileField(),
   company: z.string().optional(),
+  // Pre-filled into every new bill; past bills keep the rate they were billed at.
+  electricityRate: z.coerce
+    .number()
+    .positive("Enter the rate per unit")
+    .max(1000, "That rate looks wrong"),
   address: z.string().optional(),
 });
 
@@ -74,6 +79,7 @@ function ProfileTab() {
           email: owner.email,
           phone: owner.phone,
           company: owner.company ?? "",
+          electricityRate: owner.electricityRate ?? 10,
           address: owner.address ?? "",
         }
       : undefined,
@@ -134,6 +140,19 @@ function ProfileTab() {
 
           <Field label="Company" htmlFor="s-company">
             <Input id="s-company" {...register("company")} />
+          </Field>
+
+          <Field
+            label="Electricity Rate (₹ per unit)"
+            htmlFor="s-rate"
+            error={errors.electricityRate?.message}
+          >
+            <Input
+              id="s-rate"
+              type="number"
+              inputMode="decimal"
+              {...register("electricityRate")}
+            />
           </Field>
 
           <Field label="Address" htmlFor="s-address">

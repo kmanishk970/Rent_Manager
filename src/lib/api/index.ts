@@ -10,6 +10,7 @@ import {
 import type {
   AppNotification,
   DocumentType,
+  ElectricityMode,
   Floor,
   HouseholdMember,
   OwnerProfile,
@@ -342,6 +343,10 @@ export interface NewBillInput {
   month: string;
   rent: number;
   electricity: number;
+  electricityMode?: ElectricityMode;
+  meterPrevious?: number;
+  meterCurrent?: number;
+  unitRate?: number;
   otherCharges?: number;
   otherLabel?: string;
   dueDate?: string;
@@ -366,6 +371,10 @@ export function createBill(input: NewBillInput): Promise<RentBill> {
     month: input.month,
     rent: input.rent,
     electricity: input.electricity,
+    electricityMode: input.electricityMode ?? "flat",
+    meterPrevious: input.meterPrevious,
+    meterCurrent: input.meterCurrent,
+    unitRate: input.unitRate,
     otherCharges: input.otherCharges ?? 0,
     otherLabel: input.otherLabel,
     dueDate: input.dueDate || `${input.month}-05`,

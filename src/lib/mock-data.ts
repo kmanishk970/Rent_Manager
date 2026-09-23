@@ -177,6 +177,9 @@ function monthBack(key: string, n: number): string {
 /** How many months of history each tenancy gets. */
 const HISTORY = 5;
 
+/** Matches the owner profile's default tariff. */
+const SEED_UNIT_RATE = 10;
+
 /**
  * Bills and payments, generated per tenant so the ledger has something with
  * real shape in it: months settled in full, a month paid short that carries its
@@ -198,13 +201,22 @@ function buildLedger(): { bills: RentBill[]; payments: RentPayment[] } {
     const endMonth = tenant.leaseEnd.slice(0, 7);
     const anchor = endMonth < SEED_MONTH ? endMonth : SEED_MONTH;
 
+    // The meter is on the unit and only climbs, so readings accumulate across
+    // the months rather than being drawn independently.
+    let reading = 1000 + index * 137;
+
     for (let back = HISTORY - 1; back >= 0; back--) {
       const month = monthBack(anchor, back);
       // Nothing is billed outside the lease.
       if (month < startMonth || month > endMonth) continue;
 
-      // 300–850, varying by tenant and month so no two rows look alike.
-      const electricity = 300 + (((index * 7 + back * 5) % 12) * 50);
+      // 30–85 units, varying by tenant and month so no two rows look alike.
+      const units = 30 + ((index * 7 + back * 5) % 12) * 5;
+      const meterPrevious = reading;
+      const meterCurrent = reading + units;
+      reading = meterCurrent;
+
+      const electricity = units * SEED_UNIT_RATE;
       const rent = tenant.rentAmount;
       const total = rent + electricity;
 
@@ -216,6 +228,10 @@ function buildLedger(): { bills: RentBill[]; payments: RentPayment[] } {
         month,
         rent,
         electricity,
+        electricityMode: "meter",
+        meterPrevious,
+        meterCurrent,
+        unitRate: SEED_UNIT_RATE,
         otherCharges: 0,
         dueDate: `${month}-05`,
       });
@@ -331,4 +347,5 @@ export const ownerProfile: OwnerProfile = {
   plan: "Professional",
   address: "14th Cross, 5th Block, Koramangala, Bangalore - 560095",
   company: "Kapoor Properties",
+  electricityRate: 10,
 };

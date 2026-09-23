@@ -25,6 +25,7 @@ import {
   buildStatements,
   type MonthlyStatement,
 } from "@/lib/rent-ledger";
+import { meterWorking } from "@/lib/electricity";
 import type { PaymentStatus, Tenant } from "@/types";
 
 const FILTERS = ["all", "paid", "partial", "pending", "overdue"] as const;
@@ -367,6 +368,8 @@ export default function RentPage() {
                     <div className="text-xs text-slate-400">
                       Rent {inr(statement.rent)} · Electricity{" "}
                       {inr(statement.electricity)}
+                      {meterWorking(statement.bill) &&
+                        ` (${meterWorking(statement.bill)})`}
                       {statement.other > 0 &&
                         ` · ${statement.bill.otherLabel || "Other"} ${inr(statement.other)}`}
                     </div>

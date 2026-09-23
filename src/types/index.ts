@@ -131,6 +131,12 @@ export interface Tenant {
  * top of it. Payments are recorded separately and set against this, so a month
  * can be settled in instalments and any shortfall or advance carries forward.
  */
+/**
+ * How a month's electricity was arrived at. Metered units bill the difference
+ * between two readings; a unit with no sub-meter takes a flat figure.
+ */
+export type ElectricityMode = "meter" | "flat";
+
 export interface RentBill {
   id: string;
   tenantId: string;
@@ -139,7 +145,21 @@ export interface RentBill {
   /** "2026-09" — sortable, and unambiguous about which year it belongs to. */
   month: string;
   rent: number;
+  /** The rupee figure, derived from the readings when metered. */
   electricity: number;
+  electricityMode: ElectricityMode;
+  /**
+   * Meter readings are cumulative, so the month's consumption is the
+   * difference between them. Both are stored rather than just the units used,
+   * so a bill can always show its own working.
+   *
+   * The meter belongs to the unit, not the tenant — it keeps counting across a
+   * change of tenancy.
+   */
+  meterPrevious?: number;
+  meterCurrent?: number;
+  /** ₹ per unit at the time of billing, so a later tariff change is not retroactive. */
+  unitRate?: number;
   /** Maintenance, water, parking — whatever else the landlord adds. */
   otherCharges: number;
   otherLabel?: string;
@@ -194,4 +214,6 @@ export interface OwnerProfile {
   plan: string;
   address: string;
   company: string;
+  /** Default ₹ per electricity unit, pre-filled into every new bill. */
+  electricityRate: number;
 }

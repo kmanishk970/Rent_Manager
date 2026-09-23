@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQueryState } from "nuqs";
-import { Plus, Search } from "lucide-react";
+import { FolderOpen, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -93,29 +93,44 @@ export default function DocumentsPage() {
               : documents.filter((d) => d.type === type).length;
           const active = typeFilter === type;
 
+          const Icon =
+            type === "all" ? FolderOpen : DOCUMENT_TYPE_ICONS[type as DocumentType];
+          const label =
+            type === "all"
+              ? "All Documents"
+              : DOCUMENT_TYPE_LABELS[type as DocumentType];
+
           return (
             <button
               key={type}
               type="button"
               aria-pressed={active}
               onClick={() => setTypeFilter(type)}
-              className={`rounded-xl border p-3 text-left transition-all ${
+              title={label}
+              className={`flex h-full flex-col items-start gap-2 rounded-xl border p-3 text-left transition-all ${
                 active
                   ? "border-blue-300 bg-blue-50"
                   : "border-slate-200 bg-white hover:border-blue-200"
               }`}
             >
-              <div className="mb-1 text-lg" aria-hidden>
-                {type === "all"
-                  ? "📂"
-                  : DOCUMENT_TYPE_ICONS[type as DocumentType]}
-              </div>
-              <div className="text-base font-bold text-slate-900">{count}</div>
-              <div className="mt-0.5 text-xs text-slate-500">
-                {type === "all"
-                  ? "All Documents"
-                  : DOCUMENT_TYPE_LABELS[type as DocumentType]}
-              </div>
+              {/* A fixed box, so every tile's count starts at the same height */}
+              <span
+                aria-hidden
+                className={`flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                  active ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"
+                }`}
+              >
+                <Icon className="size-4" strokeWidth={1.75} />
+              </span>
+
+              <span className="min-w-0 self-stretch">
+                <span className="block text-base font-bold text-slate-900">
+                  {count}
+                </span>
+                <span className="mt-0.5 block text-xs leading-snug text-slate-500">
+                  {label}
+                </span>
+              </span>
             </button>
           );
         })}
@@ -150,9 +165,12 @@ export default function DocumentsPage() {
               <div className="flex items-start gap-3">
                 <div
                   aria-hidden
-                  className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xl transition-colors group-hover:bg-blue-50"
+                  className={`flex size-10 shrink-0 items-center justify-center rounded-xl transition-colors ${DOCUMENT_TYPE_TONES[doc.type]}`}
                 >
-                  {DOCUMENT_TYPE_ICONS[doc.type]}
+                  {(() => {
+                    const Icon = DOCUMENT_TYPE_ICONS[doc.type];
+                    return <Icon className="size-5" strokeWidth={1.75} />;
+                  })()}
                 </div>
 
                 <div className="min-w-0 flex-1">

@@ -10,7 +10,7 @@ import { HouseholdMembersCard } from "@/components/tenants/household-members-car
 import { RentHistoryCard } from "@/components/rent/rent-history-card";
 import { useDocuments, useProperties, useTenant } from "@/lib/queries";
 import { daysUntil, formatDate, inr, tenancyYear } from "@/lib/format";
-import { DOCUMENT_TYPE_ICONS } from "@/lib/documents";
+import { DOCUMENT_TYPE_ICONS, DOCUMENT_TYPE_TONES } from "@/lib/documents";
 
 /** Replaces every character except the last four, keeping spacing intact. */
 function maskId(value: string): string {
@@ -349,9 +349,12 @@ export default function TenantProfilePage({
                   >
                     <div
                       aria-hidden
-                      className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-base"
+                      className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${DOCUMENT_TYPE_TONES[doc.type]}`}
                     >
-                      {DOCUMENT_TYPE_ICONS[doc.type]}
+                      {(() => {
+                        const Icon = DOCUMENT_TYPE_ICONS[doc.type];
+                        return <Icon className="size-4" strokeWidth={1.75} />;
+                      })()}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium text-slate-800">

@@ -1,3 +1,11 @@
+import {
+  Building2,
+  FileSignature,
+  FolderOpen,
+  IdCard,
+  ShieldCheck,
+  type LucideIcon,
+} from "lucide-react";
 import type { DocumentType } from "@/types";
 
 export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
@@ -8,12 +16,19 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   other: "Other",
 };
 
-export const DOCUMENT_TYPE_ICONS: Record<DocumentType, string> = {
-  agreement: "📄",
-  "id-proof": "🪪",
-  "police-verification": "🔒",
-  "property-doc": "🏢",
-  other: "📁",
+/**
+ * Drawn icons rather than emoji.
+ *
+ * Emoji render in the OS colour font, so each glyph brings its own metrics —
+ * a row of them sits at mismatched sizes and baselines, and drags whatever is
+ * under it out of line. These share one weight, one grid and one size.
+ */
+export const DOCUMENT_TYPE_ICONS: Record<DocumentType, LucideIcon> = {
+  agreement: FileSignature,
+  "id-proof": IdCard,
+  "police-verification": ShieldCheck,
+  "property-doc": Building2,
+  other: FolderOpen,
 };
 
 export const DOCUMENT_TYPE_TONES: Record<DocumentType, string> = {

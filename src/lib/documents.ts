@@ -1,11 +1,3 @@
-import {
-  Building2,
-  FileSignature,
-  FolderOpen,
-  IdCard,
-  ShieldCheck,
-  type LucideIcon,
-} from "lucide-react";
 import type { DocumentType } from "@/types";
 
 export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
@@ -17,19 +9,31 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
 };
 
 /**
- * Drawn icons rather than emoji.
- *
- * Emoji render in the OS colour font, so each glyph brings its own metrics —
- * a row of them sits at mismatched sizes and baselines, and drags whatever is
- * under it out of line. These share one weight, one grid and one size.
+ * Emoji glyphs come from the OS colour font, so each carries its own metrics
+ * and none of them share a baseline. Always render one inside a fixed box that
+ * centres it — see `DOCUMENT_ICON_BOX` — rather than letting it sit in the
+ * text flow, where the differing heights drag everything around them out of
+ * line.
  */
-export const DOCUMENT_TYPE_ICONS: Record<DocumentType, LucideIcon> = {
-  agreement: FileSignature,
-  "id-proof": IdCard,
-  "police-verification": ShieldCheck,
-  "property-doc": Building2,
-  other: FolderOpen,
+export const DOCUMENT_TYPE_ICONS: Record<DocumentType, string> = {
+  agreement: "📄",
+  "id-proof": "🪪",
+  "police-verification": "🔒",
+  "property-doc": "🏢",
+  other: "📁",
 };
+
+export const ALL_DOCUMENTS_ICON = "📂";
+
+/**
+ * The box every document emoji sits in.
+ *
+ * `leading-none` with flex centring is what does the work: it drops the glyph's
+ * own line box, so a tall emoji and a short one occupy identical space and the
+ * content beneath them lands at the same height in every tile.
+ */
+export const DOCUMENT_ICON_BOX =
+  "flex shrink-0 items-center justify-center rounded-lg leading-none select-none";
 
 export const DOCUMENT_TYPE_TONES: Record<DocumentType, string> = {
   agreement: "bg-blue-100 text-blue-700",

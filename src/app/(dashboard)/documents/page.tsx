@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQueryState } from "nuqs";
-import { FolderOpen, Plus, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import { UploadDocumentDialog } from "@/components/documents/upload-document-dia
 import { useDeleteDocument, useDocuments } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
 import {
+  ALL_DOCUMENTS_ICON,
+  DOCUMENT_ICON_BOX,
   DOCUMENT_TYPE_ICONS,
   DOCUMENT_TYPE_LABELS,
   DOCUMENT_TYPE_TONES,
@@ -93,8 +95,10 @@ export default function DocumentsPage() {
               : documents.filter((d) => d.type === type).length;
           const active = typeFilter === type;
 
-          const Icon =
-            type === "all" ? FolderOpen : DOCUMENT_TYPE_ICONS[type as DocumentType];
+          const icon =
+            type === "all"
+              ? ALL_DOCUMENTS_ICON
+              : DOCUMENT_TYPE_ICONS[type as DocumentType];
           const label =
             type === "all"
               ? "All Documents"
@@ -113,21 +117,22 @@ export default function DocumentsPage() {
                   : "border-slate-200 bg-white hover:border-blue-200"
               }`}
             >
-              {/* A fixed box, so every tile's count starts at the same height */}
+              {/* Fixed box + leading-none: the glyph's own metrics stop
+                  mattering, so every tile's count lands at the same height. */}
               <span
                 aria-hidden
-                className={`flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
-                  active ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"
+                className={`${DOCUMENT_ICON_BOX} size-9 text-lg transition-colors ${
+                  active ? "bg-blue-100" : "bg-slate-100"
                 }`}
               >
-                <Icon className="size-4" strokeWidth={1.75} />
+                {icon}
               </span>
 
               <span className="min-w-0 self-stretch">
-                <span className="block text-base font-bold text-slate-900">
+                <span className="block text-base leading-none font-bold text-slate-900">
                   {count}
                 </span>
-                <span className="mt-0.5 block text-xs leading-snug text-slate-500">
+                <span className="mt-1.5 block text-xs leading-snug text-slate-500">
                   {label}
                 </span>
               </span>
@@ -165,12 +170,9 @@ export default function DocumentsPage() {
               <div className="flex items-start gap-3">
                 <div
                   aria-hidden
-                  className={`flex size-10 shrink-0 items-center justify-center rounded-xl transition-colors ${DOCUMENT_TYPE_TONES[doc.type]}`}
+                  className={`${DOCUMENT_ICON_BOX} size-10 rounded-xl text-xl transition-colors ${DOCUMENT_TYPE_TONES[doc.type]}`}
                 >
-                  {(() => {
-                    const Icon = DOCUMENT_TYPE_ICONS[doc.type];
-                    return <Icon className="size-5" strokeWidth={1.75} />;
-                  })()}
+                  {DOCUMENT_TYPE_ICONS[doc.type]}
                 </div>
 
                 <div className="min-w-0 flex-1">

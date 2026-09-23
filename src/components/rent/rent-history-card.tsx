@@ -70,11 +70,13 @@ function StatementRow({
   statement,
   bills,
   onEdit,
+  onPay,
 }: {
   statement: MonthlyStatement;
   /** Every bill for the unit, so a broken reading chain can be spotted. */
   bills: RentBill[];
   onEdit: (bill: RentBill) => void;
+  onPay: (month: string) => void;
 }) {
   const { rent, electricity, other, total, paid, opening, shortfall, credit } =
     statement;
@@ -164,6 +166,16 @@ function StatementRow({
           </div>
         )}
       </dl>
+
+      {shortfall > 0 && (
+        <button
+          type="button"
+          onClick={() => onPay(statement.month)}
+          className="mt-2 w-full rounded-lg bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-100"
+        >
+          Record payment for {monthLabel(statement.month)}
+        </button>
+      )}
     </div>
   );
 }
@@ -179,6 +191,7 @@ export function RentHistoryCard({ tenant }: { tenant: Tenant }) {
   const [billOpen, setBillOpen] = useState(false);
   const [editing, setEditing] = useState<RentBill | undefined>();
   const [payOpen, setPayOpen] = useState(false);
+  const [payMonth, setPayMonth] = useState<string | undefined>();
 
   if (billsPending || paymentsPending) {
     return <Skeleton className="h-64 rounded-xl" />;
@@ -287,17 +300,30 @@ export function RentHistoryCard({ tenant }: { tenant: Tenant }) {
                 statement={statement}
                 bills={unitBills}
                 onEdit={openEdit}
+                onPay={(month) => {
+                  setPayMonth(month);
+                  setPayOpen(true);
+                }}
               />
             ))}
           </div>
 
           <button
             type="button"
-            onClick={() => setPayOpen(true)}
+            onClick={() => {
+              setPayMonth(undefined);
+              setPayOpen(true);
+            }}
             className="mt-3 w-full rounded-lg bg-green-50 px-3 py-2 text-xs font-medium text-green-700 transition-colors hover:bg-green-100"
           >
             Record Payment
           </button>
+
+          {/* Statuses are derived from payments rather than set by hand, so
+              say where they come from instead of offering a status control. */}
+          <p className="mt-2 text-center text-[11px] text-slate-400">
+            A month turns Paid once payments cover it.
+          </p>
         </>
       )}
 
@@ -312,6 +338,7 @@ export function RentHistoryCard({ tenant }: { tenant: Tenant }) {
         open={payOpen}
         onOpenChange={setPayOpen}
         defaultTenantId={tenant.id}
+        defaultMonth={payMonth}
       />
     </div>
   );

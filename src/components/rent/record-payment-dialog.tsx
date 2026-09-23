@@ -46,10 +46,13 @@ export function RecordPaymentDialog({
   open,
   onOpenChange,
   defaultTenantId,
+  defaultMonth,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultTenantId?: string;
+  /** Opens on a specific month, for the action on that month's row. */
+  defaultMonth?: string;
 }) {
   const { data: tenants } = useTenants();
   const { data: bills } = useBills();
@@ -88,9 +91,10 @@ export function RecordPaymentDialog({
   const summary = summarise(statements);
   const monthStatement = statements.find((s) => s.month === month);
 
-  // Everything owed to date beats the month's own total: paying that clears
-  // the arrears as well, which is what a landlord collecting late wants.
-  const suggested = summary.outstanding || monthStatement?.total || 0;
+  // The month's shortfall already carries any earlier dues into it, so it is
+  // both the figure shown on the row and the one that settles the month.
+  const suggested =
+    monthStatement?.shortfall || summary.outstanding || monthStatement?.total || 0;
 
   useEffect(() => {
     if (suggested > 0) {
@@ -99,8 +103,10 @@ export function RecordPaymentDialog({
   }, [suggested, setValue]);
 
   useEffect(() => {
-    if (open && defaultTenantId) setValue("tenantId", defaultTenantId);
-  }, [open, defaultTenantId, setValue]);
+    if (!open) return;
+    if (defaultTenantId) setValue("tenantId", defaultTenantId);
+    setValue("month", defaultMonth ?? monthKey());
+  }, [open, defaultTenantId, defaultMonth, setValue]);
 
   const onSubmit = handleSubmit(async (values) => {
     const parsed = schema.parse(values);

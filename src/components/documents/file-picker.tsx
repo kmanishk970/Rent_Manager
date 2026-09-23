@@ -2,6 +2,9 @@
 
 import { useRef, useState } from "react";
 import { FileText, ImageIcon, UploadCloud, X } from "lucide-react";
+import { formatBytes } from "@/lib/format";
+
+export { formatBytes };
 
 /** What the dialog accepts, kept in one place for the input and the check. */
 export const ACCEPTED_TYPES = [
@@ -13,14 +16,6 @@ export const ACCEPTED_TYPES = [
 
 export const ACCEPT_ATTR = ".pdf,.jpg,.jpeg,.png,.webp";
 export const MAX_BYTES = 20 * 1024 * 1024;
-
-/** "2.4 MB" — sized to the unit that reads naturally. */
-export function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  const kb = bytes / 1024;
-  if (kb < 1024) return `${Math.round(kb)} KB`;
-  return `${(kb / 1024).toFixed(1)} MB`;
-}
 
 /** Why a file was rejected, or null when it is fine. */
 export function rejectionReason(file: File): string | null {

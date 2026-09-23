@@ -5,8 +5,8 @@ import { useForm, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { User } from "lucide-react";
 import { Field } from "@/components/form/field";
+import { PhotoPicker } from "@/components/form/photo-picker";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -145,7 +145,17 @@ function validateMembers(drafts: MemberDraft[]): {
   return { ok: values.length === drafts.length, errors, values };
 }
 
-function StepOne({ form }: { form: UseFormReturn<FormValues> }) {
+function StepOne({
+  form,
+  photo,
+  photoError,
+  onPhotoChange,
+}: {
+  form: UseFormReturn<FormValues>;
+  photo: File | null;
+  photoError?: string;
+  onPhotoChange: (file: File | null, reason: string | null) => void;
+}) {
   const {
     register,
     setValue,
@@ -163,14 +173,12 @@ function StepOne({ form }: { form: UseFormReturn<FormValues> }) {
         step 3.
       </p>
 
-      <div className="flex items-center gap-4">
-        <div className="flex size-16 items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-100">
-          <User className="size-7 text-slate-400" strokeWidth={1.5} />
-        </div>
-        <p className="text-xs text-slate-400">
-          Photo upload arrives with the backend&apos;s file storage.
-        </p>
-      </div>
+      <PhotoPicker
+        file={photo}
+        error={photoError}
+        onPick={onPhotoChange}
+        onClear={() => onPhotoChange(null, null)}
+      />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field
@@ -497,6 +505,8 @@ export function AddTenantDialog({
   const [step, setStep] = useState(1);
   // Members are a list of sub-records, which react-hook-form models awkwardly,
   // so they are kept beside the form and validated on their own.
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoError, setPhotoError] = useState<string>();
   const [members, setMembers] = useState<MemberDraft[]>([]);
   const [memberErrors, setMemberErrors] = useState<MemberErrors[]>([]);
   const createTenant = useCreateTenant();
@@ -518,6 +528,8 @@ export function AddTenantDialog({
 
   const reset = () => {
     form.reset();
+    setPhoto(null);
+    setPhotoError(undefined);
     setMembers([]);
     setMemberErrors([]);
     setStep(1);
@@ -546,7 +558,13 @@ export function AddTenantDialog({
     }
 
     const parsed = schema.parse(values);
-    await createTenant.mutateAsync({ ...parsed, members: household.values });
+    await createTenant.mutateAsync({
+      ...parsed,
+      members: household.values,
+      // The picker revokes its own preview, so the stored photo gets its own
+      // URL. Undefined leaves the API's placeholder in place.
+      photo: photo ? URL.createObjectURL(photo) : undefined,
+    });
     toast.success(
       household.values.length > 0
         ? `${parsed.name} and ${household.values.length} member${household.values.length > 1 ? "s" : ""} added`
@@ -595,7 +613,17 @@ export function AddTenantDialog({
 
         <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col" noValidate>
           <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-            {step === 1 && <StepOne form={form} />}
+            {step === 1 && (
+              <StepOne
+                form={form}
+                photo={photo}
+                photoError={photoError}
+                onPhotoChange={(file, reason) => {
+                  setPhoto(file);
+                  setPhotoError(reason ?? undefined);
+                }}
+              />
+            )}
             {step === 2 && <StepTwo form={form} />}
             {step === 3 && (
               <StepThree

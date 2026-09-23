@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
-import Image from "next/image";
+import { useEffect, useState } from "react";
 import { useQueryState } from "nuqs";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,6 +8,7 @@ import { z } from "zod";
 import { emailField, mobileField, nameField, passwordField } from "@/lib/validation";
 import { toast } from "sonner";
 import { Field } from "@/components/form/field";
+import { PhotoPicker } from "@/components/form/photo-picker";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -71,6 +71,9 @@ function ProfileTab() {
   const { data: owner, isPending } = useOwnerProfile();
   const updateProfile = useUpdateOwnerProfile();
 
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoError, setPhotoError] = useState<string>();
+
   const form = useForm<ProfileValues>({
     resolver: zodResolver(profileSchema),
     values: owner
@@ -93,7 +96,12 @@ function ProfileTab() {
   } = form;
 
   const onSubmit = handleSubmit(async (values) => {
-    await updateProfile.mutateAsync(values);
+    await updateProfile.mutateAsync({
+      ...values,
+      // The picker revokes its own preview, so a kept photo needs its own URL.
+      ...(photo ? { photo: URL.createObjectURL(photo) } : {}),
+    });
+    setPhoto(null);
     toast.success("Profile updated");
   });
 
@@ -105,19 +113,19 @@ function ProfileTab() {
         Profile Information
       </h3>
 
-      <div className="flex items-center gap-4">
-        <Image
-          src={owner.photo}
-          alt=""
-          width={64}
-          height={64}
-          className="size-16 rounded-xl bg-slate-100 object-cover"
-          unoptimized
-        />
-        <p className="text-xs text-slate-400">
-          Photo upload arrives with the backend&apos;s file storage.
-        </p>
-      </div>
+      <PhotoPicker
+        file={photo}
+        currentUrl={owner.photo}
+        error={photoError}
+        onPick={(file, reason) => {
+          setPhoto(file);
+          setPhotoError(reason ?? undefined);
+        }}
+        onClear={() => {
+          setPhoto(null);
+          setPhotoError(undefined);
+        }}
+      />
 
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -161,14 +169,17 @@ function ProfileTab() {
         </div>
 
         <div className="flex gap-3 pt-2">
-          <Button type="submit" disabled={updateProfile.isPending || !isDirty}>
+          <Button
+            type="submit"
+            disabled={updateProfile.isPending || (!isDirty && !photo)}
+          >
             {updateProfile.isPending ? "Saving…" : "Save Changes"}
           </Button>
           <Button
             type="button"
             variant="outline"
             onClick={() => reset()}
-            disabled={!isDirty}
+            disabled={!isDirty && !photo}
           >
             Cancel
           </Button>

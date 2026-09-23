@@ -121,6 +121,14 @@ export function tenancyYear(start: string, leaseEnd?: string): TenancyYear {
   };
 }
 
+/** "2.4 MB" — sized to whichever unit reads naturally. */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${Math.round(kb)} KB`;
+  return `${(kb / 1024).toFixed(1)} MB`;
+}
+
 /** "AM" for Arjun Mehta — avatar fallback initials. */
 export function initials(name: string): string {
   return name

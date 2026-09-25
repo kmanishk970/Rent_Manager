@@ -46,24 +46,38 @@ export function GlowCard({
       backgroundColor={isDark ? "rgba(255, 255, 255, 0.11)" : "#ffffff"}
       // `rounded-xl` is 0.875rem — BorderGlow takes px.
       borderRadius={14}
-      colors={["#60a5fa", "#a78bfa", "#f472b6"]}
+      // Muted from the saturated 400-weights this started on. At full
+      // saturation the sheen read as neon against a dark card — the hues are
+      // the same, carrying about half the chroma.
+      colors={["#6d8fc4", "#8f86b8", "#bd8aa4"]}
       glowRadius={26}
-      // Halo and border line dialled well back — at full strength the edge read
-      // as a lit strip rather than a glow on a tile this small.
-      glowIntensity={0.4}
-      borderIntensity={0.45}
-      coneSpread={32}
       /*
-       * Near-zero on purpose. The fill layer paints a mesh gradient across the
-       * whole card and masks its middle out with ellipses placed at 33/50/66%.
-       * Those percentages are authored for a large hero card; on a ~200px stat
-       * tile they land mid-card, so the subtracted mask leaves a bright wedge
-       * aimed at the centre instead of a glow hugging the edge. Dropping this
-       * leaves the border line and the outer halo — the two layers that
-       * actually produce the effect in the reference.
+       * Both dialled well down.
+       *
+       * glowIntensity scales the alpha of every shadow layer, and those layers
+       * include *inset* ones. The halo is masked by a conic gradient centred on
+       * the card, so the inset half paints a wedge inward from the lit edge —
+       * on a tile this small that wedge reaches the middle and reads as a hard
+       * cone rather than a glow. Lowering the alpha is what softens it; the
+       * geometry is BorderGlow's own and shared with every other caller.
        */
-      fillOpacity={0.03}
-      edgeSensitivity={26}
+      glowIntensity={0.16}
+      borderIntensity={0.26}
+      coneSpread={38}
+      /*
+       * Off entirely.
+       *
+       * The fill layer paints a mesh gradient across the whole card and masks
+       * its middle out with ellipses placed at 33/50/66%. Those percentages
+       * are authored for a large hero card; on a ~200px stat tile they land
+       * mid-card, so the subtracted mask leaves a hard-edged wedge aimed at
+       * the centre instead of a glow hugging the edge. It was already near
+       * zero and still showing its seam, so it is now nothing at all: the
+       * border line and the outer halo are the two layers that actually make
+       * the effect.
+       */
+      fillOpacity={0}
+      edgeSensitivity={34}
       className={cn("backdrop-blur-xl", className)}
     >
       {children}

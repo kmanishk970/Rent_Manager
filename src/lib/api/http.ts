@@ -14,8 +14,33 @@ import {
  * goes on every request, and an expired access token is exchanged for a fresh
  * one and the request retried — once.
  */
+/** The port the API listens on in development. */
+const API_PORT = 4000;
+
+/**
+ * Where the API is, from wherever this page was opened.
+ *
+ * NEXT_PUBLIC_API_URL wins when it is set — that is how a deployed build points
+ * at a real host. With nothing configured the host is taken from the current
+ * page rather than hardcoded to localhost, because "localhost" means the
+ * *browser's* machine: open the app on the LAN address, or from a phone, and a
+ * hardcoded localhost would look for an API on that device.
+ */
+function apiBaseUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_API_URL;
+  if (configured) return configured;
+
+  if (typeof window !== "undefined") {
+    const { protocol, hostname } = window.location;
+    return `${protocol}//${hostname}:${API_PORT}/api/v1`;
+  }
+
+  // Server-side render: nothing here calls the API, but a base URL is needed.
+  return `http://localhost:${API_PORT}/api/v1`;
+}
+
 export const http = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api/v1",
+  baseURL: apiBaseUrl(),
   headers: { "Content-Type": "application/json" },
   timeout: 15_000,
 });

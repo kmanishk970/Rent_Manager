@@ -460,3 +460,84 @@
 :hover::-webkit-scrollbar-thumb {
   opacity: 1;
 }
+
+/*
+ * Border beam.
+ *
+ * A point of light that travels around an element's edge on hover. Drawn as a
+ * conic gradient whose starting angle is animated, then masked down to the
+ * border ring: the element's own box is punched out of the gradient, leaving
+ * only a 1.5px band around it.
+ *
+ * The angle has to be a registered property — a plain custom property is a
+ * string as far as the engine is concerned, so it would jump from 0 to 360
+ * rather than sweeping.
+ */
+@property --beam-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes beam-travel {
+  to {
+    --beam-angle: 360deg;
+  }
+}
+
+.border-beam {
+  position: relative;
+}
+
+.border-beam::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  /* The band's thickness: the mask punches out everything inside this. */
+  padding: 1.5px;
+  /*
+   * Fully transparent for most of the sweep, so it reads as one travelling
+   * highlight rather than a rotating ring. The transparent stops carry the
+   * beam's own hue at zero alpha — plain `transparent` is rgba(0,0,0,0), which
+   * fades through grey on the way out.
+   */
+  background: conic-gradient(
+    from var(--beam-angle),
+    var(--beam-fade, rgb(37 99 235 / 0)) 0deg,
+    var(--beam-fade, rgb(37 99 235 / 0)) 255deg,
+    var(--beam-color, rgb(37 99 235 / 0.9)) 320deg,
+    var(--beam-fade, rgb(37 99 235 / 0)) 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+  /* The beam is decoration; clicks belong to the element underneath. */
+  pointer-events: none;
+}
+
+.border-beam:hover::after,
+.border-beam:focus-visible::after {
+  opacity: 1;
+  animation: beam-travel 2s linear infinite;
+}
+
+/*
+ * Motion is the whole effect, so with it turned off the beam becomes a plain
+ * ring rather than a stationary bright spot on one arbitrary edge.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .border-beam:hover::after,
+  .border-beam:focus-visible::after {
+    animation: none;
+    background: var(--beam-color, rgb(37 99 235 / 0.9));
+    opacity: 0.35;
+  }
+}

@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RecordPaymentDialog } from "@/components/rent/record-payment-dialog";
-import { GlowCard } from "@/components/ui/glow-card";
+import { LiftCard } from "@/components/ui/lift-card";
 import { useBills, usePayments, useProperties, useTenants } from "@/lib/queries";
 import { formatDate, inr, inrK, monthLabel, monthLong } from "@/lib/format";
 import {
@@ -167,7 +167,7 @@ export default function RentPage() {
           const share = total ? Math.round((card.value / total) * 100) : 0;
 
           return (
-            <GlowCard key={card.label} className="content-start p-4">
+            <LiftCard key={card.label} className="content-start p-4">
               <div className="flex items-center gap-2.5">
                 <span
                   className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${card.tile}`}
@@ -197,7 +197,7 @@ export default function RentPage() {
                   </>
                 )}
               </div>
-            </GlowCard>
+            </LiftCard>
           );
         })}
       </div>

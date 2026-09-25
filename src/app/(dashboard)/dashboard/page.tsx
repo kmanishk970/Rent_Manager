@@ -29,7 +29,7 @@ import { occupancyChartData, rentChartData } from "@/lib/mock-data";
 import { useOwnerProfile, usePayments, useProperties } from "@/lib/queries";
 import { inr, inrK, inrL, monthLong } from "@/lib/format";
 import { Skeleton } from "@/components/ui/skeleton";
-import { GlowCard } from "@/components/ui/glow-card";
+import { LiftCard } from "@/components/ui/lift-card";
 
 function StatCard({
   label,
@@ -48,7 +48,7 @@ function StatCard({
     // The label rides alongside the icon rather than below the figure. Pairing
     // the two smallest elements into one row lets the number own the card,
     // which is what the eye should land on first.
-    <GlowCard className="content-start p-4">
+    <LiftCard className="content-start p-4">
       <div className="flex items-center gap-2.5">
         <div
           className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${tone}`}
@@ -70,7 +70,7 @@ function StatCard({
       {sub && (
         <div className="mt-2 text-xs font-medium text-slate-400">{sub}</div>
       )}
-    </GlowCard>
+    </LiftCard>
   );
 }
 

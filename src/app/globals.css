@@ -584,19 +584,29 @@
     0 18px 38px -10px rgb(15 23 42 / 0.2);
 }
 
+/*
+ * On dark, the card casts light rather than shade.
+ *
+ * A shadow works by darkening what is behind it, and there is nothing left to
+ * darken on a near-black ground — black on black is simply invisible, however
+ * much of it there is. So the direction inverts: a soft white bloom around the
+ * card reads as separation from the surface in exactly the way a drop shadow
+ * does on white.
+ *
+ * Kept well under 20% alpha and pushed out with a negative spread, so it is a
+ * halo the eye reads as depth rather than a glow it reads as decoration.
+ */
 .dark .lift-card {
-  box-shadow:
-    0 1px 2px -1px rgb(0 0 0 / 0.5),
-    0 4px 14px -4px rgb(0 0 0 / 0.4);
+  box-shadow: 0 4px 16px -8px rgb(255 255 255 / 0.07);
 }
 
 /*
- * The hover state is deliberately a long way from the resting one — the gap
- * between them is what sells the card coming forward, and on a dark ground a
- * small increment is imperceptible.
+ * Two layers on hover: a tight one just under the card that reads as contact,
+ * and a wide soft one that reads as the distance it has travelled. The gap
+ * between this and the resting state is what sells the lift.
  */
 .dark .lift-card:hover {
   box-shadow:
-    0 4px 10px -2px rgb(0 0 0 / 0.55),
-    0 24px 48px -12px rgb(0 0 0 / 0.7);
+    0 4px 12px -6px rgb(255 255 255 / 0.14),
+    0 14px 36px -12px rgb(255 255 255 / 0.2);
 }

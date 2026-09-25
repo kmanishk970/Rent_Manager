@@ -547,7 +547,12 @@
 .border-beam:hover::after,
 .border-beam:focus-visible::after {
   opacity: 1;
-  animation: beam-travel 2s linear infinite;
+  /*
+   * Tunable per caller, and it has to be: the duration is one lap, so the same
+   * number means very different speeds on a nav pill and on a card with four
+   * times the perimeter. Callers set it to keep the apparent pace even.
+   */
+  animation: beam-travel var(--beam-speed, 3.5s) linear infinite;
 }
 
 /*

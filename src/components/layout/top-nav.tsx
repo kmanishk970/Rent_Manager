@@ -114,7 +114,10 @@ export function TopNav() {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "border-beam flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-colors",
+                  "border-beam nav-pill flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold",
+                  // The shadow is in globals.css; these are the rest.
+                  "transition-[color,background-color,box-shadow,transform] duration-200 ease-out",
+                  "hover:-translate-y-px focus-visible:-translate-y-px motion-reduce:transform-none",
                   active
                     ? "bg-blue-600 text-white shadow-sm shadow-blue-600/25"
                     : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",

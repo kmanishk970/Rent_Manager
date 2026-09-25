@@ -610,3 +610,39 @@
     0 4px 12px -6px rgb(255 255 255 / 0.14),
     0 14px 36px -12px rgb(255 255 255 / 0.2);
 }
+
+/*
+ * Nav pills.
+ *
+ * Flat at rest — a row of raised buttons would be noise — and lifted under the
+ * pointer. Same reasoning as the stat cards: light darkens its ground, so the
+ * light theme casts shade and the dark theme casts a bloom.
+ *
+ * Only the shadow lives here. The transform and the transition are Tailwind
+ * classes on the element, so they sit alongside the colour change already
+ * there rather than a shorthand overriding it.
+ */
+.nav-pill:hover,
+.nav-pill:focus-visible {
+  box-shadow:
+    0 1px 2px -1px rgb(15 23 42 / 0.1),
+    0 6px 16px -6px rgb(15 23 42 / 0.2);
+}
+
+.dark .nav-pill:hover,
+.dark .nav-pill:focus-visible {
+  box-shadow:
+    0 2px 8px -4px rgb(255 255 255 / 0.12),
+    0 10px 22px -12px rgb(255 255 255 / 0.18);
+}
+
+/*
+ * The active pill is blue, and a blue shadow under a blue button reads as the
+ * button's own light rather than a grey smudge borrowed from the page.
+ */
+.nav-pill[data-on-accent]:hover,
+.nav-pill[data-on-accent]:focus-visible {
+  box-shadow:
+    0 2px 6px -1px rgb(37 99 235 / 0.35),
+    0 10px 24px -8px rgb(37 99 235 / 0.45);
+}

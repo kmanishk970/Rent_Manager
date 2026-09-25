@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { emailField } from "@/lib/validation";
 import { Field } from "@/components/form/field";
+import { PasswordInput } from "@/components/form/password-input";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
 
@@ -91,9 +92,8 @@ function LoginForm() {
             </Link>
           }
         >
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="current-password"
             placeholder="Enter your password"
             aria-invalid={Boolean(errors.password)}

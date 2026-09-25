@@ -9,6 +9,7 @@ import { emailField, mobileField, nameField, passwordField } from "@/lib/validat
 import { toast } from "sonner";
 import { Field } from "@/components/form/field";
 import { PhotoPicker } from "@/components/form/photo-picker";
+import { PasswordInput } from "@/components/form/password-input";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -319,9 +320,8 @@ function SecurityTab() {
           htmlFor="pw-current"
           error={errors.current?.message}
         >
-          <Input
+          <PasswordInput
             id="pw-current"
-            type="password"
             autoComplete="current-password"
             placeholder="Enter current password"
             {...register("current")}
@@ -329,9 +329,8 @@ function SecurityTab() {
         </Field>
 
         <Field label="New Password" htmlFor="pw-next" error={errors.next?.message}>
-          <Input
+          <PasswordInput
             id="pw-next"
-            type="password"
             autoComplete="new-password"
             placeholder="Enter new password"
             {...register("next")}
@@ -343,9 +342,8 @@ function SecurityTab() {
           htmlFor="pw-confirm"
           error={errors.confirm?.message}
         >
-          <Input
+          <PasswordInput
             id="pw-confirm"
-            type="password"
             autoComplete="new-password"
             placeholder="Confirm new password"
             {...register("confirm")}

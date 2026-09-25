@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { emailField, nameField, passwordField } from "@/lib/validation";
 import { Field } from "@/components/form/field";
+import { PasswordInput } from "@/components/form/password-input";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
 
@@ -98,9 +99,8 @@ export default function SignupPage() {
           htmlFor="password"
           error={errors.password?.message}
         >
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="new-password"
             placeholder="Create a strong password"
             aria-invalid={Boolean(errors.password)}

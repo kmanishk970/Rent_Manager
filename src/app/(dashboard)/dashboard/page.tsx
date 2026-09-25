@@ -25,7 +25,7 @@ import {
   LayoutGrid,
   XCircle,
 } from "lucide-react";
-import { occupancyChartData, recentActivity, rentChartData } from "@/lib/mock-data";
+import { occupancyChartData, rentChartData } from "@/lib/mock-data";
 import { useOwnerProfile, usePayments, useProperties } from "@/lib/queries";
 import { inr, inrK, inrL, monthLong } from "@/lib/format";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -318,97 +318,73 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Activity + property overview */}
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-card">
-          <h3 className="font-display mb-4 text-base font-semibold text-slate-900">
-            Recent Activity
+      {/* Property overview */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-card">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="font-display text-base font-semibold text-slate-900">
+            Properties
           </h3>
-          <div className="space-y-3">
-            {recentActivity.map((item) => (
-              <div key={item.id} className="flex items-start gap-3">
-                <div
-                  aria-hidden
-                  className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm"
-                >
-                  {item.icon}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-slate-700">{item.text}</p>
-                  <p className="mt-0.5 text-xs text-slate-400">{item.time}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <Link
+            href="/properties"
+            className="text-xs font-medium text-blue-600 hover:underline"
+          >
+            View all
+          </Link>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-card">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="font-display text-base font-semibold text-slate-900">
-              Properties
-            </h3>
-            <Link
-              href="/properties"
-              className="text-xs font-medium text-blue-600 hover:underline"
-            >
-              View all
-            </Link>
-          </div>
+        <div className="space-y-3">
+          {properties.map((property) => {
+            const units = property.floors.flatMap((f) => f.units);
+            const occ = units.filter((u) => u.status === "occupied").length;
+            const pct = units.length
+              ? Math.round((occ / units.length) * 100)
+              : 0;
+            const rent = units
+              .filter((u) => u.status === "occupied")
+              .reduce((sum, u) => sum + u.rent, 0);
 
-          <div className="space-y-3">
-            {properties.map((property) => {
-              const units = property.floors.flatMap((f) => f.units);
-              const occ = units.filter((u) => u.status === "occupied").length;
-              const pct = units.length
-                ? Math.round((occ / units.length) * 100)
-                : 0;
-              const rent = units
-                .filter((u) => u.status === "occupied")
-                .reduce((sum, u) => sum + u.rent, 0);
-
-              return (
-                <Link
-                  key={property.id}
-                  href={`/properties/${property.id}`}
-                  className="flex w-full items-center gap-4 rounded-lg border border-slate-100 p-3 text-left transition-all hover:border-blue-200 hover:bg-blue-50/30"
-                >
-                  <Image
-                    src={property.image}
-                    alt=""
-                    width={40}
-                    height={40}
-                    className="size-10 shrink-0 rounded-lg bg-slate-100 object-cover"
-                    unoptimized
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium text-slate-800">
-                      {property.name}
-                    </div>
-                    <div className="truncate text-xs text-slate-400">
-                      {property.location}
-                    </div>
-                    <div className="mt-1.5 flex items-center gap-2">
-                      <div className="h-1.5 flex-1 rounded-full bg-slate-100">
-                        <div
-                          className="h-1.5 rounded-full bg-green-500 transition-all"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <span className="shrink-0 text-xs text-slate-500">
-                        {occ}/{units.length}
-                      </span>
-                    </div>
+            return (
+              <Link
+                key={property.id}
+                href={`/properties/${property.id}`}
+                className="flex w-full items-center gap-4 rounded-lg border border-slate-100 p-3 text-left transition-all hover:border-blue-200 hover:bg-blue-50/30"
+              >
+                <Image
+                  src={property.image}
+                  alt=""
+                  width={40}
+                  height={40}
+                  className="size-10 shrink-0 rounded-lg bg-slate-100 object-cover"
+                  unoptimized
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-slate-800">
+                    {property.name}
                   </div>
-                  <div className="shrink-0 text-right">
-                    <div className="text-sm font-semibold text-slate-800">
-                      {inrK(rent)}
-                    </div>
-                    <div className="text-xs text-slate-400">/month</div>
+                  <div className="truncate text-xs text-slate-400">
+                    {property.location}
                   </div>
-                </Link>
-              );
-            })}
-          </div>
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <div className="h-1.5 flex-1 rounded-full bg-slate-100">
+                      <div
+                        className="h-1.5 rounded-full bg-green-500 transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <span className="shrink-0 text-xs text-slate-500">
+                      {occ}/{units.length}
+                    </span>
+                  </div>
+                </div>
+                <div className="shrink-0 text-right">
+                  <div className="text-sm font-semibold text-slate-800">
+                    {inrK(rent)}
+                  </div>
+                  <div className="text-xs text-slate-400">/month</div>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </div>
     </div>

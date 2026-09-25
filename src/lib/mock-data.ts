@@ -329,14 +329,6 @@ export const notifications: AppNotification[] = [
   { id: "n10", type: "rent-reminder", title: "Rent Due — Amit Joshi", message: "Rent of ₹18,000 for Unit 203, Green Valley Residency is due for Sep 2026.", date: "2026-09-10", read: false, tenantId: "t11" },
 ];
 
-export const recentActivity = [
-  { id: "a1", type: "payment", icon: "💰", text: "Arjun Mehta paid ₹18,000 rent", time: "2 hours ago", color: "text-green-600" },
-  { id: "a2", type: "reminder", icon: "🔔", text: "Rent reminder sent to Vikram Singh", time: "4 hours ago", color: "text-blue-600" },
-  { id: "a3", type: "payment", icon: "💰", text: "Sneha Reddy paid ₹18,000 rent", time: "1 day ago", color: "text-green-600" },
-  { id: "a4", type: "document", icon: "📄", text: "Lease agreement uploaded for TechWave Solutions", time: "2 days ago", color: "text-purple-600" },
-  { id: "a5", type: "alert", icon: "⚠️", text: "Rahul Sharma rent overdue by 10 days", time: "3 days ago", color: "text-red-600" },
-  { id: "a6", type: "tenant", icon: "👤", text: "New tenant Neha Gupta added to Unit 201", time: "5 days ago", color: "text-blue-600" },
-];
 
 export const ownerProfile: OwnerProfile = {
   name: "Rajesh Kapoor",

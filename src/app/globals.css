@@ -558,3 +558,45 @@
     opacity: 0.35;
   }
 }
+
+/*
+ * Elevation for the lifting stat cards.
+ *
+ * The shared --shadow-card tokens are slate at 6–14% alpha. That reads on a
+ * white canvas and vanishes on a dark one: a faint blue-grey blur over a
+ * near-black ground has almost nothing to darken. Dark surfaces need actual
+ * black and a wider, softer spread before a shadow registers as height, so the
+ * two themes carry different values rather than one scaled up.
+ *
+ * Written here rather than as tokens because `@theme inline` bakes token values
+ * into each utility at build time — there is no runtime variable left for a
+ * `.dark` rule to override.
+ */
+.lift-card {
+  box-shadow:
+    0 1px 2px -1px rgb(15 23 42 / 0.06),
+    0 4px 16px -4px rgb(15 23 42 / 0.08);
+}
+
+.lift-card:hover {
+  box-shadow:
+    0 2px 6px -1px rgb(15 23 42 / 0.1),
+    0 18px 38px -10px rgb(15 23 42 / 0.2);
+}
+
+.dark .lift-card {
+  box-shadow:
+    0 1px 2px -1px rgb(0 0 0 / 0.5),
+    0 4px 14px -4px rgb(0 0 0 / 0.4);
+}
+
+/*
+ * The hover state is deliberately a long way from the resting one — the gap
+ * between them is what sells the card coming forward, and on a dark ground a
+ * small increment is imperceptible.
+ */
+.dark .lift-card:hover {
+  box-shadow:
+    0 4px 10px -2px rgb(0 0 0 / 0.55),
+    0 24px 48px -12px rgb(0 0 0 / 0.7);
+}

@@ -24,13 +24,15 @@ export function LiftCard({
   return (
     <div
       className={cn(
-        "rounded-xl border border-slate-200 bg-white shadow-card dark:border-white/10",
+        // lift-card carries the elevation: the shared shadow tokens are tuned
+        // for a white canvas and do not register on a dark one.
+        "lift-card rounded-xl border border-slate-200 bg-white dark:border-white/10",
         // Only the properties that actually change, so the browser is not
         // asked to watch every animatable property on the card.
         "transition-[transform,box-shadow,border-color] duration-200 ease-out",
         // The lift does the work; the shadow underneath it sells the height,
         // and the scale is small enough not to soften the text while moving.
-        "hover:-translate-y-1 hover:scale-[1.015] hover:border-slate-300 hover:shadow-card-hover",
+        "hover:-translate-y-1 hover:scale-[1.015] hover:border-slate-300",
         "dark:hover:border-white/20",
         // The raise is the whole effect, so with motion off the card keeps the
         // border and shadow change and simply does not move.

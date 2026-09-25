@@ -487,6 +487,23 @@
 
 .border-beam {
   position: relative;
+
+  /* On a light ground the accent carries; this is the default. */
+  --beam-color: rgb(37 99 235 / 0.9);
+  --beam-fade: rgb(37 99 235 / 0);
+}
+
+/*
+ * White on anything dark.
+ *
+ * Blue on a dark surface reads as a muddy smear rather than light — there is
+ * not enough separation between the beam and what it travels over. The same
+ * applies to the active pill in either theme, which is itself blue.
+ */
+.dark .border-beam,
+.border-beam[data-on-accent] {
+  --beam-color: rgb(255 255 255 / 0.95);
+  --beam-fade: rgb(255 255 255 / 0);
 }
 
 .border-beam::after {

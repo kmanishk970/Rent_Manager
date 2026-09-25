@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -119,21 +119,9 @@ export function TopNav() {
                     ? "bg-blue-600 text-white shadow-sm shadow-blue-600/25"
                     : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
                 )}
-                style={
-                  // The beam picks up the item's own ground: white on the blue
-                  // pill, blue on the light one. Its transparent stops carry
-                  // the same hue at zero alpha, so the tail fades out rather
-                  // than through grey.
-                  active
-                    ? ({
-                        "--beam-color": "rgb(255 255 255 / 0.95)",
-                        "--beam-fade": "rgb(255 255 255 / 0)",
-                      } as CSSProperties)
-                    : ({
-                        "--beam-color": "rgb(37 99 235 / 0.9)",
-                        "--beam-fade": "rgb(37 99 235 / 0)",
-                      } as CSSProperties)
-                }
+                // The beam's colour is a stylesheet concern: white on the
+                // active pill and throughout the dark theme, accent otherwise.
+                data-on-accent={active ? "" : undefined}
               >
                 <Icon
                   className={cn(

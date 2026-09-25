@@ -27,6 +27,10 @@ export function LiftCard({
         // lift-card carries the elevation: the shared shadow tokens are tuned
         // for a white canvas and do not register on a dark one.
         "lift-card rounded-xl border border-slate-200 bg-white dark:border-white/10",
+        // A light travels the edge on hover. One pixel here rather than the
+        // nav's 1.5 — the same line looks like a stripe on a card this size.
+        // Its colour comes from the theme: accent on light, white on dark.
+        "border-beam [--beam-width:1px]",
         // Only the properties that actually change, so the browser is not
         // asked to watch every animatable property on the card.
         "transition-[transform,box-shadow,border-color] duration-200 ease-out",

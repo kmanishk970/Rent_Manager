@@ -511,8 +511,12 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  /* The band's thickness: the mask punches out everything inside this. */
-  padding: 1.5px;
+  /*
+   * The band's thickness: the mask punches out everything inside this. Tunable
+   * per caller, because a line that reads as thin on a nav pill reads as a
+   * stripe on a card four times its size.
+   */
+  padding: var(--beam-width, 1.5px);
   /*
    * Fully transparent for most of the sweep, so it reads as one travelling
    * highlight rather than a rotating ring. The transparent stops carry the

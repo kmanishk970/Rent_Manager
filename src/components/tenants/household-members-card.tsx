@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowUpDown, Pencil, Trash2, UserPlus, Users } from "lucide-react";
+import Image from "next/image";
+import { ArrowUpDown, Eye, Pencil, Trash2, UserPlus, Users } from "lucide-react";
 import { toast } from "sonner";
 import { MemberDialog } from "@/components/tenants/member-dialog";
+import { MemberDetailsDialog } from "@/components/tenants/member-details-dialog";
 import { ChangePrimaryTenantDialog } from "@/components/tenants/change-primary-tenant-dialog";
 import { useRemoveHouseholdMember } from "@/lib/queries";
 import { relationLabel, relationTone } from "@/lib/members";
@@ -31,11 +33,13 @@ function maskId(value: string): string {
 function MemberRow({
   tenant,
   member,
+  onView,
   onEdit,
   onPromote,
 }: {
   tenant: Tenant;
   member: HouseholdMember;
+  onView: () => void;
   onEdit: () => void;
   onPromote: () => void;
 }) {
@@ -60,12 +64,23 @@ function MemberRow({
 
   return (
     <div className="flex items-start gap-3 rounded-lg bg-slate-50 p-3">
-      <div
-        aria-hidden
-        className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-xs font-semibold text-slate-600 ring-1 ring-slate-200"
-      >
-        {initials(member.name)}
-      </div>
+      {member.photo ? (
+        <Image
+          src={member.photo}
+          alt=""
+          width={36}
+          height={36}
+          className="size-9 shrink-0 rounded-lg object-cover ring-1 ring-slate-200"
+          unoptimized
+        />
+      ) : (
+        <div
+          aria-hidden
+          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-xs font-semibold text-slate-600 ring-1 ring-slate-200"
+        >
+          {initials(member.name)}
+        </div>
+      )}
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
@@ -114,6 +129,15 @@ function MemberRow({
         <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
+            onClick={onView}
+            aria-label={`View ${member.name}`}
+            title="View details and documents"
+            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-white hover:text-blue-600"
+          >
+            <Eye className="size-4" />
+          </button>
+          <button
+            type="button"
             onClick={onPromote}
             aria-label={`Make ${member.name} the primary tenant`}
             title="Make primary tenant"
@@ -150,6 +174,7 @@ function MemberRow({
 export function HouseholdMembersCard({ tenant }: { tenant: Tenant }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<HouseholdMember | undefined>();
+  const [viewing, setViewing] = useState<HouseholdMember | undefined>();
   const [changingPrimary, setChangingPrimary] = useState(false);
   // Set when the swap is started from a member's row rather than the header.
   const [promoting, setPromoting] = useState<string | undefined>();
@@ -234,6 +259,7 @@ export function HouseholdMembersCard({ tenant }: { tenant: Tenant }) {
               key={member.id}
               tenant={tenant}
               member={member}
+              onView={() => setViewing(member)}
               onEdit={() => openEdit(member)}
               onPromote={() => {
                 setPromoting(member.id);
@@ -267,6 +293,16 @@ export function HouseholdMembersCard({ tenant }: { tenant: Tenant }) {
         tenantName={tenant.name}
         member={editing}
       />
+
+      {viewing && (
+        <MemberDetailsDialog
+          open={Boolean(viewing)}
+          onOpenChange={(next) => !next && setViewing(undefined)}
+          member={viewing}
+          tenantName={tenant.name}
+          onEdit={() => openEdit(viewing)}
+        />
+      )}
 
       <ChangePrimaryTenantDialog
         open={changingPrimary}

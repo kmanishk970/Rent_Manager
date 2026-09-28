@@ -1,14 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Field } from "@/components/form/field";
 import { PhotoPicker } from "@/components/form/photo-picker";
+import { IdPhotos } from "@/components/documents/id-photos";
+import { useUpload } from "@/lib/use-upload";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -23,8 +26,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MemberListEditor } from "@/components/tenants/member-list-editor";
-import { useCreateTenant, useProperties } from "@/lib/queries";
+import { HouseholdMembersCard } from "@/components/tenants/household-members-card";
+import {
+  useCreateDocument,
+  useCreateTenant,
+  useProperties,
+  useTenant,
+} from "@/lib/queries";
+import { apiErrorMessage } from "@/lib/api/http";
 import { inrK } from "@/lib/format";
 import {
   checkIdNumber,
@@ -38,12 +47,7 @@ import {
   pincodeField,
   textField,
 } from "@/lib/validation";
-import {
-  validateMember,
-  type MemberDraft,
-  type MemberErrors,
-} from "@/lib/members";
-import type { HouseholdMember, IdType } from "@/types";
+import type { IdType } from "@/types";
 
 const ID_TYPES = [
   "Aadhaar",
@@ -107,54 +111,42 @@ const schema = z
 
 type FormValues = z.input<typeof schema>;
 
-const STEP_COUNT = 4;
 
-/**
- * Which react-hook-form fields each step owns, used to validate incrementally.
- * Step 3 is absent because the household members it edits live outside the
- * form — they are a list, and validated by `validateMember` instead.
- */
-const STEP_FIELDS: Record<number, (keyof FormValues)[]> = {
-  1: ["name", "phone", "email", "occupation", "address", "city", "state", "pincode", "idType", "idNumber"],
-  2: ["propertyId", "floorId", "unitId", "rentAmount", "deposit", "leaseStart", "leaseEnd"],
-  4: ["emergencyContact", "emergencyPhone"],
-};
 
-/**
- * Validates every member, collecting the ones that parse and the errors for the
- * ones that do not, so a single pass drives both the submit and the step gate.
- */
-function validateMembers(drafts: MemberDraft[]): {
-  ok: boolean;
-  errors: MemberErrors[];
-  values: Omit<HouseholdMember, "id">[];
-} {
-  const errors: MemberErrors[] = [];
-  const values: Omit<HouseholdMember, "id">[] = [];
-
-  drafts.forEach((draft, index) => {
-    const result = validateMember(draft);
-    if (result.ok) {
-      errors[index] = {};
-      values.push(result.value);
-    } else {
-      errors[index] = result.errors;
-    }
-  });
-
-  return { ok: values.length === drafts.length, errors, values };
-}
-
-function StepOne({
+function PersonalSection({
   form,
   photo,
   photoError,
+  photoProgress,
+  photoCompressing,
   onPhotoChange,
+  idProof,
+  idProofError,
+  idProofProgress,
+  idProofCompressing,
+  onIdProofChange,
+  idBack,
+  idBackError,
+  idBackProgress,
+  idBackCompressing,
+  onIdBackChange,
 }: {
   form: UseFormReturn<FormValues>;
   photo: File | null;
   photoError?: string;
+  photoProgress?: number | null;
+  photoCompressing?: boolean;
   onPhotoChange: (file: File | null, reason: string | null) => void;
+  idProof: File | null;
+  idProofError?: string;
+  idProofProgress?: number | null;
+  idProofCompressing?: boolean;
+  onIdProofChange: (file: File | null, reason: string | null) => void;
+  idBack: File | null;
+  idBackError?: string;
+  idBackProgress?: number | null;
+  idBackCompressing?: boolean;
+  onIdBackChange: (file: File | null, reason: string | null) => void;
 }) {
   const {
     register,
@@ -164,23 +156,25 @@ function StepOne({
   } = form;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <p className="text-sm font-medium text-slate-600">
         Primary Tenant — Personal Information
       </p>
       <p className="-mt-2 text-xs text-slate-400">
-        This is the person on the lease. Anyone else living with them is added in
-        step 3.
+        This is the person on the lease. Anyone else living with them is added
+        once the tenant is saved.
       </p>
 
       <PhotoPicker
         file={photo}
         error={photoError}
+        progress={photoProgress}
+        compressing={photoCompressing}
         onPick={onPhotoChange}
         onClear={() => onPhotoChange(null, null)}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field
           label="Full Name"
           htmlFor="t-name"
@@ -267,14 +261,42 @@ function StepOne({
             {...register("idNumber")}
           />
         </Field>
+
+        <div className="sm:col-span-2">
+          <IdPhotos
+            label={watch("idType")}
+            front={{
+              file: idProof,
+              error: idProofError,
+              progress: idProofProgress,
+              compressing: idProofCompressing,
+            }}
+            back={{
+              file: idBack,
+              error: idBackError,
+              progress: idBackProgress,
+              compressing: idBackCompressing,
+            }}
+            onFrontChange={onIdProofChange}
+            onBackChange={onIdBackChange}
+          />
+        </div>
       </div>
     </div>
   );
 }
 
-function StepTwo({ form }: { form: UseFormReturn<FormValues> }) {
+function UnitSection({
+  form,
+  locked,
+  onUnlock,
+}: {
+  form: UseFormReturn<FormValues>;
+  /** The unit this was opened for, already chosen elsewhere. */
+  locked?: { property: string; floor: string; unit: string };
+  onUnlock: () => void;
+}) {
   const {
-    register,
     setValue,
     watch,
     formState: { errors },
@@ -288,12 +310,35 @@ function StepTwo({ form }: { form: UseFormReturn<FormValues> }) {
   const property = properties?.find((p) => p.id === propertyId);
   const floor = property?.floors.find((f) => f.id === floorId);
 
-  return (
-    <div className="space-y-4">
-      <p className="text-sm font-medium text-slate-600">
-        Property &amp; Unit Assignment
-      </p>
+  // Arriving from a unit page, the answer is already known — three selects
+  // asking it again is work the person has done. It stays changeable, because
+  // picking the wrong unit and having to start over would be worse.
+  if (locked) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <div className="min-w-0">
+            <div className="text-xs text-slate-400">Unit</div>
+            <div className="truncate text-sm font-medium text-slate-800">
+              {locked.property} · {locked.floor} · Unit {locked.unit}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onUnlock}
+            className="shrink-0 text-xs font-medium text-blue-600 hover:underline"
+          >
+            Change
+          </button>
+        </div>
 
+        <LeaseTerms form={form} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
       <Field label="Property" htmlFor="t-property" error={errors.propertyId?.message}>
         <Select
           value={propertyId}
@@ -387,73 +432,107 @@ function StepTwo({ form }: { form: UseFormReturn<FormValues> }) {
         </Field>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Monthly Rent (₹)" htmlFor="t-rent" error={errors.rentAmount?.message}>
-          <Input id="t-rent" type="number" placeholder="18000" {...register("rentAmount")} />
-        </Field>
-
-        <Field label="Security Deposit (₹)" htmlFor="t-deposit" error={errors.deposit?.message}>
-          <Input id="t-deposit" type="number" placeholder="54000" {...register("deposit")} />
-        </Field>
-
-        <Field label="Lease Start" htmlFor="t-start" error={errors.leaseStart?.message}>
-          <Input id="t-start" type="date" {...register("leaseStart")} />
-        </Field>
-
-        <Field label="Lease End" htmlFor="t-end" error={errors.leaseEnd?.message}>
-          <Input id="t-end" type="date" {...register("leaseEnd")} />
-        </Field>
-      </div>
+      <LeaseTerms form={form} />
     </div>
   );
 }
 
-function StepThree({
-  members,
-  errors,
-  onMembersChange,
-}: {
-  members: MemberDraft[];
-  errors: MemberErrors[];
-  onMembersChange: (next: MemberDraft[]) => void;
-}) {
+/** Rent, deposit and term — asked whether or not the unit was preselected. */
+/**
+ * The last day of a one-year term: the day before the anniversary.
+ *
+ * A lease starting 1 Oct 2026 runs to 30 Sep 2027, not 1 Oct — the term is a
+ * year, and the anniversary belongs to the next one.
+ *
+ * Built on Date's overflow rather than a date library's clamping, because the
+ * two disagree exactly where February does. A term from 29 Feb 2028 has no
+ * anniversary: overflowing to 1 Mar and stepping back lands on 28 Feb 2029,
+ * while clamping to 28 Feb first and then stepping back loses a day. Going the
+ * other way — stepping back before adding the year — fixes that case and
+ * breaks 1 Mar 2027, which should end on the leap day itself.
+ *
+ * Returns null for anything that is not a full date, which is what a
+ * half-typed one looks like while somebody is still typing it.
+ */
+function oneYearTerm(start: string): string | null {
+  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(start);
+  if (!parts) return null;
+
+  const end = new Date(
+    Date.UTC(Number(parts[1]) + 1, Number(parts[2]) - 1, Number(parts[3])),
+  );
+  end.setUTCDate(end.getUTCDate() - 1);
+  return end.toISOString().slice(0, 10);
+}
+
+function LeaseTerms({ form }: { form: UseFormReturn<FormValues> }) {
+  const {
+    register,
+    setValue,
+    getValues,
+    formState: { errors },
+  } = form;
+
+  // What the end date was last filled in with automatically. A date the person
+  // typed themselves is theirs to keep, so the suggestion only replaces one
+  // that is empty or still exactly as suggested.
+  const suggested = useRef<string>("");
+
+  const startField = register("leaseStart");
+
   return (
-    <div className="space-y-4">
-      <div>
-        <p className="text-sm font-medium text-slate-600">Household Members</p>
-        <p className="mt-1 text-xs text-slate-400">
-          Optional. Record everyone else who will occupy the unit and how they
-          relate to the primary tenant.
-        </p>
-      </div>
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <Field label="Monthly Rent (₹)" htmlFor="t-rent" error={errors.rentAmount?.message}>
+        <Input id="t-rent" type="number" placeholder="18000" {...register("rentAmount")} />
+      </Field>
 
-      <MemberListEditor
-        members={members}
-        errors={errors}
-        onChange={onMembersChange}
-      />
+      <Field label="Security Deposit (₹)" htmlFor="t-deposit" error={errors.deposit?.message}>
+        <Input id="t-deposit" type="number" placeholder="54000" {...register("deposit")} />
+      </Field>
+
+      <Field label="Lease Start" htmlFor="t-start" error={errors.leaseStart?.message}>
+        <Input
+          id="t-start"
+          type="date"
+          {...startField}
+          onChange={(event) => {
+            void startField.onChange(event);
+
+            const term = oneYearTerm(event.target.value);
+            if (!term) return;
+
+            const end = getValues("leaseEnd");
+            if (end && end !== suggested.current) return;
+
+            suggested.current = term;
+            setValue("leaseEnd", term, { shouldValidate: true });
+          }}
+        />
+      </Field>
+
+      <Field
+        label="Lease End"
+        htmlFor="t-end"
+        error={errors.leaseEnd?.message}
+        hint="Filled in as one year, change it for any other term"
+      >
+        <Input id="t-end" type="date" {...register("leaseEnd")} />
+      </Field>
     </div>
   );
 }
 
-function StepFour({ form }: { form: UseFormReturn<FormValues> }) {
+function EmergencySection({ form }: { form: UseFormReturn<FormValues> }) {
   const {
     register,
     formState: { errors },
   } = form;
 
-  const documentSlots = [
-    { label: "Rental Agreement", icon: "📄", required: true },
-    { label: "ID Proof (Aadhaar/PAN/Passport)", icon: "🪪", required: true },
-    { label: "Police Verification Form", icon: "🔒", required: false },
-    { label: "Cheque / Payment Screenshot", icon: "💳", required: false },
-  ];
-
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <p className="text-sm font-medium text-slate-600">Emergency Contact</p>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field
           label="Contact Name"
           htmlFor="t-emergency-name"
@@ -470,27 +549,6 @@ function StepFour({ form }: { form: UseFormReturn<FormValues> }) {
           <Input id="t-emergency-phone" placeholder="+91 98765 11111" {...register("emergencyPhone")} />
         </Field>
       </div>
-
-      <p className="pt-2 text-sm font-medium text-slate-600">Documents</p>
-      <div className="space-y-3">
-        {documentSlots.map((doc) => (
-          <div
-            key={doc.label}
-            className="flex items-center gap-4 rounded-xl border border-dashed border-slate-300 p-4"
-          >
-            <span className="text-2xl" aria-hidden>
-              {doc.icon}
-            </span>
-            <div className="flex-1">
-              <div className="text-sm font-medium text-slate-800">{doc.label}</div>
-              <div className="mt-0.5 text-xs text-slate-400">
-                {doc.required ? "Required" : "Optional"} · Upload arrives with the
-                backend
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
@@ -498,18 +556,49 @@ function StepFour({ form }: { form: UseFormReturn<FormValues> }) {
 export function AddTenantDialog({
   open,
   onOpenChange,
+  unitId: preselectedUnit,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Opened from a unit page: that unit is the assignment, already decided. */
+  unitId?: string;
 }) {
-  const [step, setStep] = useState(1);
-  // Members are a list of sub-records, which react-hook-form models awkwardly,
-  // so they are kept beside the form and validated on their own.
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoError, setPhotoError] = useState<string>();
-  const [members, setMembers] = useState<MemberDraft[]>([]);
-  const [memberErrors, setMemberErrors] = useState<MemberErrors[]>([]);
+  const [idProof, setIdProof] = useState<File | null>(null);
+  const [idProofError, setIdProofError] = useState<string>();
+  const [idBack, setIdBack] = useState<File | null>(null);
+  const [idBackError, setIdBackError] = useState<string>();
+  // Set once the tenancy exists. The dialog then stops being a form and
+  // becomes the household, so more people can be added without reopening it.
+  const [addedId, setAddedId] = useState<string | null>(null);
+  const [unitLocked, setUnitLocked] = useState(true);
+
   const createTenant = useCreateTenant();
+  const createDocument = useCreateDocument();
+  const { data: properties } = useProperties();
+  const { data: added } = useTenant(addedId ?? "");
+  const {
+    upload: uploadPhoto,
+    cancel: cancelPhoto,
+    progress: photoProgress,
+    compressing: photoCompressing,
+    uploading: photoUploading,
+  } = useUpload("photos");
+  const {
+    upload: uploadIdProof,
+    cancel: cancelIdProof,
+    progress: idProofProgress,
+    compressing: idProofCompressing,
+    uploading: idProofUploading,
+  } = useUpload("documents");
+  const {
+    upload: uploadIdBack,
+    cancel: cancelIdBack,
+    progress: idBackProgress,
+    compressing: idBackCompressing,
+    uploading: idBackUploading,
+  } = useUpload("documents");
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -526,53 +615,133 @@ export function AddTenantDialog({
     },
   });
 
+  /**
+   * Where the preselected unit sits, once the property tree has loaded.
+   *
+   * A unit id on its own is not enough to fill the form — the lease needs the
+   * property and floor it belongs to, and the person needs to see which unit
+   * they are letting rather than a UUID.
+   */
+  const placed = useMemo(() => {
+    if (!preselectedUnit || !properties) return null;
+    for (const property of properties) {
+      for (const floor of property.floors) {
+        const unit = floor.units.find((u) => u.id === preselectedUnit);
+        if (unit) return { property, floor, unit };
+      }
+    }
+    return null;
+  }, [preselectedUnit, properties]);
+
+  // Fill the assignment in as soon as it is known, including the rent and
+  // deposit the unit already carries.
+  useEffect(() => {
+    if (!open || !placed) return;
+    form.setValue("propertyId", placed.property.id);
+    form.setValue("floorId", placed.floor.id);
+    form.setValue("unitId", placed.unit.id);
+    form.setValue("rentAmount", placed.unit.rent as unknown as FormValues["rentAmount"]);
+    form.setValue("deposit", placed.unit.deposit as unknown as FormValues["deposit"]);
+  }, [open, placed, form]);
+
   const reset = () => {
+    cancelPhoto();
+    cancelIdProof();
+    cancelIdBack();
     form.reset();
     setPhoto(null);
     setPhotoError(undefined);
-    setMembers([]);
-    setMemberErrors([]);
-    setStep(1);
+    setIdProof(null);
+    setIdProofError(undefined);
+    setIdBack(null);
+    setIdBackError(undefined);
+    setAddedId(null);
+    setUnitLocked(true);
   };
 
-  // Only advance once the current step's own fields pass validation.
-  const next = async () => {
-    if (step === 3) {
-      const result = validateMembers(members);
-      setMemberErrors(result.errors);
-      if (!result.ok) return;
-    } else {
-      const valid = await form.trigger(STEP_FIELDS[step]);
-      if (!valid) return;
-    }
-    setStep((s) => Math.min(STEP_COUNT, s + 1));
-  };
+  const busy =
+    photoCompressing ||
+    photoUploading ||
+    idProofCompressing ||
+    idProofUploading ||
+    idBackCompressing ||
+    idBackUploading ||
+    createTenant.isPending ||
+    createDocument.isPending;
 
-  const onSubmit = form.handleSubmit(async (values) => {
-    // Members were checked on step 3, but a re-edit could have broken one.
-    const household = validateMembers(members);
-    if (!household.ok) {
-      setMemberErrors(household.errors);
-      setStep(3);
-      return;
-    }
+  const onSubmit = form.handleSubmit(
+    async (values) => {
+      const parsed = schema.parse(values);
 
-    const parsed = schema.parse(values);
-    await createTenant.mutateAsync({
-      ...parsed,
-      members: household.values,
-      // The picker revokes its own preview, so the stored photo gets its own
-      // URL. Undefined leaves the API's placeholder in place.
-      photo: photo ? URL.createObjectURL(photo) : undefined,
-    });
-    toast.success(
-      household.values.length > 0
-        ? `${parsed.name} and ${household.values.length} member${household.values.length > 1 ? "s" : ""} added`
-        : `${parsed.name} added`,
-    );
+      // Both files go up before the tenancy is created, so every record is
+      // saved with a URL already known to work. A failed upload stops here
+      // rather than filing a tenant against a file that never arrived.
+      let uploaded;
+      if (photo) {
+        uploaded = await uploadPhoto(photo);
+        if (!uploaded) return;
+      }
+
+      let idProofMedia;
+      if (idProof) {
+        idProofMedia = await uploadIdProof(idProof);
+        if (!idProofMedia) return;
+      }
+
+      let idBackMedia;
+      if (idBack) {
+        idBackMedia = await uploadIdBack(idBack);
+        if (!idBackMedia) return;
+      }
+
+      let tenant;
+      try {
+        tenant = await createTenant.mutateAsync({ ...parsed, photo: uploaded });
+      } catch (error) {
+        // Without this the rejection goes nowhere: the dialog stays open, the
+        // button un-presses, and the person is left to guess. A unit already
+        // let, an ID already on file — the API says so, so repeat it.
+        toast.error(apiErrorMessage(error, "Could not add that tenant"));
+        return;
+      }
+
+      // The ID photo is filed against the tenancy, which only has an id now
+      // that it exists. Failing here must not undo a tenant who was added
+      // correctly — the file is stored, so the worst case is a document to
+      // attach by hand, and saying so beats losing the tenant.
+      if (idProofMedia) {
+        try {
+          await createDocument.mutateAsync({
+            name: `${parsed.idType} — ${parsed.name}`,
+            type: "id-proof",
+            tenantId: tenant.id,
+            propertyId: tenant.propertyId,
+            file: idProofMedia,
+            back: idBackMedia,
+          });
+        } catch (error) {
+          toast.error(
+            apiErrorMessage(
+              error,
+              `${parsed.name} was added, but the ${parsed.idType} photo could not be filed. Attach it from Documents.`,
+            ),
+          );
+        }
+      }
+
+      toast.success(`${parsed.name} added`);
+      setAddedId(tenant.id);
+    },
+
+    // Every field is on screen now, so react-hook-form focuses the first bad
+    // one; this only says that something is wrong, for anyone who missed it.
+    () => toast.error("Check the highlighted fields"),
+  );
+
+  const close = () => {
     reset();
     onOpenChange(false);
-  });
+  };
 
   return (
     <Dialog
@@ -582,90 +751,108 @@ export function AddTenantDialog({
         onOpenChange(nextOpen);
       }}
     >
-      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="font-display text-lg font-semibold text-slate-900">
-            Add New Tenant
+            {addedId ? `${added?.name ?? "Tenant"} added` : "Add New Tenant"}
           </DialogTitle>
-          <DialogDescription className="sr-only">
-            Add a tenant in four steps: personal details, unit assignment,
-            household members, then emergency contact and documents.
+          <DialogDescription>
+            {addedId
+              ? "Add anyone else living with them, or close when you are done."
+              : "Personal details, the unit they are taking, and their ID."}
           </DialogDescription>
-
-          <div className="flex items-center gap-2" aria-hidden>
-            {[1, 2, 3, 4].map((s) => (
-              <div
-                key={s}
-                className={`h-1.5 rounded-full transition-all ${
-                  s === step
-                    ? "w-6 bg-blue-600"
-                    : s < step
-                      ? "w-4 bg-blue-300"
-                      : "w-4 bg-slate-200"
-                }`}
-              />
-            ))}
-            <span className="ml-1 text-xs text-slate-400">
-              Step {step} of {STEP_COUNT}
-            </span>
-          </div>
         </DialogHeader>
 
-        <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col" noValidate>
-          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-            {step === 1 && (
-              <StepOne
+        {addedId ? (
+          <>
+            {added ? (
+              <HouseholdMembersCard tenant={added} />
+            ) : (
+              <Skeleton className="h-48 rounded-xl" />
+            )}
+            <div className="flex justify-end">
+              <Button type="button" onClick={close}>
+                Done
+              </Button>
+            </div>
+          </>
+        ) : (
+          <form onSubmit={onSubmit} noValidate>
+            <div className="space-y-5">
+              <PersonalSection
                 form={form}
                 photo={photo}
                 photoError={photoError}
+                photoProgress={photoProgress}
+                photoCompressing={photoCompressing}
                 onPhotoChange={(file, reason) => {
                   setPhoto(file);
                   setPhotoError(reason ?? undefined);
                 }}
-              />
-            )}
-            {step === 2 && <StepTwo form={form} />}
-            {step === 3 && (
-              <StepThree
-                members={members}
-                errors={memberErrors}
-                onMembersChange={(next) => {
-                  setMembers(next);
-                  // Stale messages would otherwise sit under a fixed field.
-                  setMemberErrors([]);
+                idProof={idProof}
+                idProofError={idProofError}
+                idProofProgress={idProofProgress}
+                idProofCompressing={idProofCompressing}
+                onIdProofChange={(file, reason) => {
+                  setIdProof(file);
+                  setIdProofError(reason ?? undefined);
+                }}
+                idBack={idBack}
+                idBackError={idBackError}
+                idBackProgress={idBackProgress}
+                idBackCompressing={idBackCompressing}
+                onIdBackChange={(file, reason) => {
+                  setIdBack(file);
+                  setIdBackError(reason ?? undefined);
                 }}
               />
-            )}
-            {step === 4 && <StepFour form={form} />}
-          </div>
 
-          <div className="mt-4 flex gap-3 border-t border-slate-200 pt-4">
-            {step > 1 && (
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1"
-                onClick={() => setStep((s) => s - 1)}
-              >
-                Back
-              </Button>
-            )}
+              <div className="border-t border-slate-100 pt-4">
+                <p className="mb-3 text-sm font-medium text-slate-600">
+                  Unit &amp; Lease
+                </p>
+                <UnitSection
+                  form={form}
+                  locked={
+                    placed && unitLocked
+                      ? {
+                          property: placed.property.name,
+                          floor: placed.floor.name,
+                          unit: placed.unit.number,
+                        }
+                      : undefined
+                  }
+                  onUnlock={() => setUnitLocked(false)}
+                />
+              </div>
 
-            {step < STEP_COUNT ? (
-              <Button type="button" className="flex-1" onClick={next}>
-                Continue
-              </Button>
-            ) : (
+              <div className="border-t border-slate-100 pt-4">
+                <EmergencySection form={form} />
+              </div>
+            </div>
+
+            {/* Submit alone: the dialog's own ✕ already backs out, and a
+                Cancel beside it only halves the target for the one action
+                anybody opened this to take. */}
+            <div className="sticky bottom-0 -mx-4 mt-5 border-t border-slate-200 bg-popover px-4 pt-3 pb-1">
               <Button
                 type="submit"
-                className="flex-1 bg-green-600 hover:bg-green-700"
-                disabled={createTenant.isPending}
+                className="w-full bg-green-600 hover:bg-green-700"
+                disabled={busy}
               >
-                {createTenant.isPending ? "Adding…" : "Add Tenant"}
+                {photoCompressing || idProofCompressing || idBackCompressing
+                  ? "Compressing…"
+                  : photoUploading
+                    ? `Uploading photo… ${photoProgress ?? 0}%`
+                    : idProofUploading || idBackUploading
+                      ? `Uploading ID… ${idProofProgress ?? idBackProgress ?? 0}%`
+                      : createTenant.isPending || createDocument.isPending
+                        ? "Adding…"
+                        : "Add Tenant"}
               </Button>
-            )}
-          </div>
-        </form>
+            </div>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );

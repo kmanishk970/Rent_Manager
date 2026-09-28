@@ -61,7 +61,6 @@ export interface Unit {
   rent: number;
   deposit: number;
   status: UnitStatus;
-  tenantId?: string;
 }
 
 export interface Floor {
@@ -88,7 +87,13 @@ export interface Property {
  * carries the details a landlord needs for occupancy and police verification.
  */
 export interface HouseholdMember {
+  /** The occupancy — this person's place on this lease. */
   id: string;
+  /**
+   * The person themselves, which is what a document is filed against.
+   * Absent on a member being drafted: nobody exists to point at yet.
+   */
+  personId?: string;
   name: string;
   relation: MemberRelation;
   /** Spelled out, used when `relation` is "Other". */
@@ -98,10 +103,15 @@ export interface HouseholdMember {
   occupation?: string;
   idType?: IdType;
   idNumber?: string;
+  /** Their photo, once one has been uploaded. */
+  photo?: string;
 }
 
 export interface Tenant {
+  /** The lease. Bills, payments and documents all key on this. */
   id: string;
+  /** The primary tenant themselves — what an edit patches. */
+  personId: string;
   name: string;
   photo: string;
   phone: string;
@@ -195,6 +205,8 @@ export interface PropertyDocument {
   uploadDate: string;
   /** Human-readable, e.g. "2.4 MB". Seeded rows carry it as given. */
   size: string;
+  /** Whose document it is, when it belongs to one person on the lease. */
+  personId?: string;
   /** The file as chosen on disk, when one was picked. */
   fileName?: string;
   mimeType?: string;
@@ -204,6 +216,11 @@ export interface PropertyDocument {
    * true of everything else the mock API holds.
    */
   previewUrl?: string;
+  /**
+   * The other side, for an ID card photographed twice. One document, two
+   * images — filing the back separately made a list of apparent duplicates.
+   */
+  backUrl?: string;
 }
 
 export interface AppNotification {

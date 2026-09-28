@@ -1,4 +1,5 @@
 import { http } from "./http";
+import type { UploadedMedia } from "./media";
 import {
   fromRelation,
   toBill,
@@ -45,7 +46,14 @@ import type {
  * Shapes are translated in ./mappers: the API splits a tenancy into a person,
  * a lease and its occupants, and the screens still want the flat tenant card
  * they were designed around.
+ *
+ * Files are the one thing that does not go through here first: they are sent
+ * to /media/upload by ./media, and the URL that comes back is passed into
+ * whichever call below saves the row.
  */
+
+export { deleteMedia, downloadUrl, uploadMedia } from "./media";
+export type { MediaFolder, UploadedMedia, UploadOptions } from "./media";
 
 const get = async <T>(url: string, params?: object): Promise<T> =>
   (await http.get<T>(url, { params })).data;
@@ -174,16 +182,30 @@ export async function getTenant(id: string): Promise<Tenant | null> {
   return data ? toTenant(data) : null;
 }
 
-export type NewMemberInput = Omit<HouseholdMember, "id">;
+export type NewMemberInput = Omit<
+  HouseholdMember,
+  "id" | "personId" | "photo"
+> & {
+  /** Their photo, already uploaded. */
+  photo?: UploadedMedia;
+};
 
-export type NewTenantInput = Omit<Tenant, "id" | "photo" | "members"> &
-  Partial<Pick<Tenant, "photo">> & { members?: NewMemberInput[] };
+export type NewTenantInput = Omit<
+  Tenant,
+  "id" | "personId" | "photo" | "members"
+> & {
+  members?: NewMemberInput[];
+  /** The tenant's photo, already uploaded. */
+  photo?: UploadedMedia;
+};
 
 /** A member, in the shape the leases endpoint takes. */
 function memberPayload(member: NewMemberInput) {
   return {
     person: {
       fullName: member.name,
+      photoUrl: member.photo?.url,
+      photoKey: member.photo?.publicId,
       phone: member.phone || undefined,
       occupation: member.occupation || undefined,
       // The API stores a date of birth; the form collects an age. An age with
@@ -214,6 +236,8 @@ export async function createTenant(input: NewTenantInput): Promise<Tenant> {
       pincode: input.pincode,
       idKind: toIdKind(input.idType),
       idNumber: input.idNumber,
+      photoUrl: input.photo?.url,
+      photoKey: input.photo?.publicId,
     },
     termStart: input.leaseStart,
     termEnd: input.leaseEnd || undefined,
@@ -224,6 +248,78 @@ export async function createTenant(input: NewTenantInput): Promise<Tenant> {
     members: (input.members ?? []).map(memberPayload),
   });
   return toTenant(data);
+}
+
+/**
+ * What can be changed about an existing tenancy.
+ *
+ * Not the unit: the API refuses to move a lease to another unit, because a
+ * tenancy of a different unit is a different tenancy — with its own rent
+ * history — not an edit of this one.
+ */
+export interface UpdateTenantInput {
+  /** The lease. */
+  id: string;
+  /** The primary tenant's person record, which holds the personal details. */
+  personId: string;
+  name?: string;
+  phone?: string;
+  email?: string;
+  occupation?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  idType?: Tenant["idType"];
+  idNumber?: string;
+  photo?: UploadedMedia;
+  rentAmount?: number;
+  deposit?: number;
+  leaseStart?: string;
+  leaseEnd?: string;
+  emergencyContact?: string;
+  emergencyPhone?: string;
+}
+
+/**
+ * Saves an edit to a tenancy.
+ *
+ * Two records, because the app's flat "tenant" is a person and a lease: who
+ * they are goes to /people, what they agreed to goes to /leases. Both are
+ * sent before either is read back, so a half-applied edit cannot be shown as
+ * though it were complete.
+ */
+export async function updateTenant(input: UpdateTenantInput): Promise<Tenant> {
+  const person = {
+    fullName: input.name,
+    phone: input.phone,
+    email: input.email,
+    occupation: input.occupation,
+    addressLine: input.address,
+    city: input.city,
+    state: input.state,
+    pincode: input.pincode,
+    idKind: input.idType ? toIdKind(input.idType) : undefined,
+    idNumber: input.idNumber,
+    photoUrl: input.photo?.url,
+    photoKey: input.photo?.publicId,
+  };
+
+  const lease = {
+    rent: input.rentAmount?.toFixed(2),
+    deposit: input.deposit?.toFixed(2),
+    termStart: input.leaseStart,
+    termEnd: input.leaseEnd || undefined,
+    emergencyName: input.emergencyContact,
+    emergencyPhone: input.emergencyPhone,
+  };
+
+  await Promise.all([
+    http.patch(`/people/${input.personId}`, person),
+    http.patch(`/leases/${input.id}`, lease),
+  ]);
+
+  return getTenant(input.id) as Promise<Tenant>;
 }
 
 export interface AddMemberInput extends NewMemberInput {
@@ -242,10 +338,36 @@ export async function addHouseholdMember(input: AddMemberInput): Promise<Tenant>
 export interface UpdateMemberInput extends Partial<NewMemberInput> {
   tenantId: string;
   memberId: string;
+  /** Needed to change anything about the person rather than the occupancy. */
+  personId?: string;
 }
 
+/**
+ * Edits a member.
+ *
+ * Two records again: the occupancy holds how they relate to the primary
+ * tenant, the person holds who they are. Without a personId only the relation
+ * can move — which is all this endpoint ever offered before.
+ */
 export async function updateHouseholdMember(input: UpdateMemberInput): Promise<Tenant> {
-  const { tenantId, memberId, ...patch } = input;
+  const { tenantId, memberId, personId, ...patch } = input;
+
+  if (personId) {
+    await http.patch(`/people/${personId}`, {
+      fullName: patch.name,
+      phone: patch.phone || undefined,
+      occupation: patch.occupation || undefined,
+      dateOfBirth:
+        patch.age === undefined
+          ? undefined
+          : `${new Date().getFullYear() - patch.age}-01-01`,
+      idKind: patch.idType ? toIdKind(patch.idType) : undefined,
+      idNumber: patch.idNumber || undefined,
+      photoUrl: patch.photo?.url,
+      photoKey: patch.photo?.publicId,
+    });
+  }
+
   const { data } = await http.patch<ApiLease>(
     `/leases/${tenantId}/occupants/${memberId}`,
     {
@@ -272,8 +394,7 @@ export interface ChangePrimaryTenantInput {
   primary: Pick<
     Tenant,
     "name" | "phone" | "email" | "occupation" | "address" | "city" | "state" | "pincode" | "idType" | "idNumber"
-  > &
-    Partial<Pick<Tenant, "photo">>;
+  > & { photo?: UploadedMedia };
   outgoing: Omit<NewMemberInput, "name">;
 }
 
@@ -306,6 +427,8 @@ export async function changePrimaryTenant(
       pincode: input.primary.pincode,
       idKind: toIdKind(input.primary.idType),
       idNumber: input.primary.idNumber,
+      photoUrl: input.primary.photo?.url,
+      photoKey: input.primary.photo?.publicId,
     });
   }
 
@@ -474,13 +597,21 @@ export interface NewDocumentInput {
   type: DocumentType;
   tenantId?: string;
   propertyId?: string;
-  fileName?: string;
-  mimeType?: string;
-  size?: string;
-  previewUrl?: string;
-  sizeBytes?: number;
+  /** Whose document it is, when it belongs to one person on the lease. */
+  personId?: string;
+  /** The attached file, already uploaded through `uploadMedia`. */
+  file: UploadedMedia;
+  /** The other side of an ID card, when it was photographed too. */
+  back?: UploadedMedia;
 }
 
+/**
+ * Records a file that has already been uploaded.
+ *
+ * The order matters: the upload happens first, and this is only called with
+ * what it returned, so a failed upload never leaves a document row pointing at
+ * a file that is not there.
+ */
 export async function createDocument(
   input: NewDocumentInput,
 ): Promise<PropertyDocument> {
@@ -489,12 +620,50 @@ export async function createDocument(
     title: input.name,
     leaseId: input.tenantId || undefined,
     propertyId: input.propertyId || undefined,
-    // Object storage is not wired up yet, so the key is a placeholder the API
-    // will replace with the real one once uploads go through it.
-    storageKey: `pending/${Date.now()}-${input.fileName ?? "document"}`,
-    originalName: input.fileName ?? input.name,
-    mimeType: input.mimeType ?? "application/octet-stream",
-    sizeBytes: input.sizeBytes ?? 1,
+    personId: input.personId || undefined,
+    storageKey: input.file.publicId,
+    url: input.file.url,
+    resourceType: input.file.resourceType,
+    originalName: input.file.originalName,
+    mimeType: input.file.mimeType,
+    sizeBytes: input.file.bytes,
+    backStorageKey: input.back?.publicId,
+    backUrl: input.back?.url,
+    backResourceType: input.back?.resourceType,
+  });
+  return toDocument(data);
+}
+
+export interface UpdateDocumentInput {
+  id: string;
+  name?: string;
+  /** A replacement front image. The one it replaces is deleted from storage. */
+  file?: UploadedMedia;
+  /** A replacement, or first, back image. */
+  back?: UploadedMedia;
+}
+
+/**
+ * Re-files an existing document.
+ *
+ * Photographing an ID card again is an edit: without this every re-upload
+ * added another row, and a tenant's list filled with rows of one name where
+ * only the last was current.
+ */
+export async function updateDocument(
+  input: UpdateDocumentInput,
+): Promise<PropertyDocument> {
+  const { data } = await http.patch<ApiDocument>(`/documents/${input.id}`, {
+    title: input.name,
+    storageKey: input.file?.publicId,
+    url: input.file?.url,
+    resourceType: input.file?.resourceType,
+    originalName: input.file?.originalName,
+    mimeType: input.file?.mimeType,
+    sizeBytes: input.file?.bytes,
+    backStorageKey: input.back?.publicId,
+    backUrl: input.back?.url,
+    backResourceType: input.back?.resourceType,
   });
   return toDocument(data);
 }
@@ -531,8 +700,13 @@ export async function getOwnerProfile(): Promise<OwnerProfile> {
   return toOwnerProfile(await get<ApiOwner>("/me"));
 }
 
+export type OwnerProfilePatch = Partial<Omit<OwnerProfile, "photo">> & {
+  /** A new profile photo, already uploaded. */
+  photo?: UploadedMedia;
+};
+
 export async function updateOwnerProfile(
-  patch: Partial<OwnerProfile>,
+  patch: OwnerProfilePatch,
 ): Promise<OwnerProfile> {
   const { data } = await http.patch<ApiOwner>("/me", {
     name: patch.name,
@@ -540,6 +714,8 @@ export async function updateOwnerProfile(
     company: patch.company,
     address: patch.address,
     electricityRate: patch.electricityRate?.toFixed(2),
+    photoUrl: patch.photo?.url,
+    photoKey: patch.photo?.publicId,
   });
   return toOwnerProfile(data);
 }

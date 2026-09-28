@@ -9,6 +9,7 @@ import { emailField, mobileField, nameField, passwordField } from "@/lib/validat
 import { toast } from "sonner";
 import { Field } from "@/components/form/field";
 import { PhotoPicker } from "@/components/form/photo-picker";
+import { useUpload } from "@/lib/use-upload";
 import { PasswordInput } from "@/components/form/password-input";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -74,6 +75,7 @@ function ProfileTab() {
 
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoError, setPhotoError] = useState<string>();
+  const { upload, progress, compressing, uploading } = useUpload("photos");
 
   const form = useForm<ProfileValues>({
     resolver: zodResolver(profileSchema),
@@ -97,11 +99,15 @@ function ProfileTab() {
   } = form;
 
   const onSubmit = handleSubmit(async (values) => {
-    await updateProfile.mutateAsync({
-      ...values,
-      // The picker revokes its own preview, so a kept photo needs its own URL.
-      ...(photo ? { photo: URL.createObjectURL(photo) } : {}),
-    });
+    // A new photo goes up first; the profile is saved with the URL it
+    // returned, so nothing is written unless the image is really there.
+    let uploaded;
+    if (photo) {
+      uploaded = await upload(photo);
+      if (!uploaded) return;
+    }
+
+    await updateProfile.mutateAsync({ ...values, photo: uploaded });
     setPhoto(null);
     toast.success("Profile updated");
   });
@@ -118,6 +124,8 @@ function ProfileTab() {
         file={photo}
         currentUrl={owner.photo}
         error={photoError}
+        progress={progress}
+        compressing={compressing}
         onPick={(file, reason) => {
           setPhoto(file);
           setPhotoError(reason ?? undefined);
@@ -172,9 +180,20 @@ function ProfileTab() {
         <div className="flex gap-3 pt-2">
           <Button
             type="submit"
-            disabled={updateProfile.isPending || (!isDirty && !photo)}
+            disabled={
+              compressing ||
+              uploading ||
+              updateProfile.isPending ||
+              (!isDirty && !photo)
+            }
           >
-            {updateProfile.isPending ? "Saving…" : "Save Changes"}
+            {compressing
+              ? "Compressing photo…"
+              : uploading
+              ? `Uploading photo… ${progress ?? 0}%`
+              : updateProfile.isPending
+                ? "Saving…"
+                : "Save Changes"}
           </Button>
           <Button
             type="button"

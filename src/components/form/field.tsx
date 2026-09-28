@@ -8,6 +8,8 @@ interface FieldProps {
   label: string;
   htmlFor?: string;
   error?: string;
+  /** Shown under the control, when there is no error to show instead. */
+  hint?: string;
   /** Rendered to the right of the label — e.g. a "Forgot password?" link. */
   action?: ReactNode;
   className?: string;
@@ -22,6 +24,7 @@ export function Field({
   label,
   htmlFor,
   error,
+  hint,
   action,
   className,
   children,
@@ -37,7 +40,7 @@ export function Field({
 
       {children}
 
-      {error && (
+      {error ? (
         <p
           id={htmlFor ? `${htmlFor}-error` : undefined}
           role="alert"
@@ -45,6 +48,9 @@ export function Field({
         >
           {error}
         </p>
+      ) : (
+        // Never both: a hint under a red message reads as part of the error.
+        hint && <p className="mt-1.5 text-xs text-slate-400">{hint}</p>
       )}
     </div>
   );

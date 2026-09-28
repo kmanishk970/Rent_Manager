@@ -3,18 +3,15 @@
 import { use, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronRight, Mail, MapPin, Phone } from "lucide-react";
+import { ChevronRight, Mail, MapPin, Pencil, Phone } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RecordPaymentDialog } from "@/components/rent/record-payment-dialog";
 import { HouseholdMembersCard } from "@/components/tenants/household-members-card";
+import { EditTenantDialog } from "@/components/tenants/edit-tenant-dialog";
 import { RentHistoryCard } from "@/components/rent/rent-history-card";
 import { useDocuments, useProperties, useTenant } from "@/lib/queries";
 import { daysUntil, formatDate, inr, tenancyYear } from "@/lib/format";
-import {
-  DOCUMENT_ICON_BOX,
-  DOCUMENT_TYPE_ICONS,
-  DOCUMENT_TYPE_TONES,
-} from "@/lib/documents";
+import { DocumentCard } from "@/components/documents/document-card";
 
 /** Replaces every character except the last four, keeping spacing intact. */
 function maskId(value: string): string {
@@ -35,6 +32,7 @@ export default function TenantProfilePage({
   const { id } = use(params);
   const [showId, setShowId] = useState(false);
   const [showRentDialog, setShowRentDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
 
   const { data: tenant, isPending } = useTenant(id);
   const { data: properties } = useProperties();
@@ -73,7 +71,14 @@ export default function TenantProfilePage({
   const floor = property?.floors.find((f) => f.id === tenant.floorId);
   const unit = floor?.units.find((u) => u.id === tenant.unitId);
 
-  const tenantDocs = (documents ?? []).filter((d) => d.tenantId === tenant.id);
+  // Filed against the tenancy: the lease itself, plus the primary tenant's own
+  // papers. A member's documents live on the member — see their View button in
+  // the household card — or the list reads as duplicates of one another.
+  const tenantDocs = (documents ?? []).filter(
+    (d) =>
+      d.tenantId === tenant.id &&
+      (!d.personId || d.personId === tenant.personId),
+  );
 
   const left = daysUntil(tenant.leaseEnd);
   const expired = left <= 0;
@@ -114,7 +119,17 @@ export default function TenantProfilePage({
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         {/* Profile column */}
         <div className="space-y-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-card">
+          <div className="relative rounded-xl border border-slate-200 bg-white p-5 shadow-card">
+            <button
+              type="button"
+              onClick={() => setShowEditDialog(true)}
+              title="Edit tenant"
+              className="absolute top-3 right-3 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-blue-600"
+            >
+              <Pencil className="size-3.5" />
+              Edit
+            </button>
+
             <div className="flex flex-col items-center text-center">
               <Image
                 src={tenant.photo}
@@ -210,6 +225,15 @@ export default function TenantProfilePage({
             <h3 className="mb-3 text-xs font-semibold tracking-wider text-slate-500 uppercase">
               Actions
             </h3>
+
+            <button
+              type="button"
+              onClick={() => setShowEditDialog(true)}
+              className="flex w-full items-center gap-3 rounded-lg bg-slate-100 px-3 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-200"
+            >
+              <span aria-hidden>✏️</span>
+              Edit Tenant
+            </button>
 
             <button
               type="button"
@@ -328,8 +352,6 @@ export default function TenantProfilePage({
 
           <HouseholdMembersCard tenant={tenant} />
 
-          <RentHistoryCard tenant={tenant} />
-
           {/* Documents */}
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-card">
             <div className="mb-4 flex items-center justify-between">
@@ -347,31 +369,7 @@ export default function TenantProfilePage({
             {tenantDocs.length > 0 ? (
               <div className="space-y-2.5">
                 {tenantDocs.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="flex items-center gap-3 rounded-lg bg-slate-50 p-3"
-                  >
-                    <div
-                      aria-hidden
-                      className={`${DOCUMENT_ICON_BOX} size-9 text-base ${DOCUMENT_TYPE_TONES[doc.type]}`}
-                    >
-                      {DOCUMENT_TYPE_ICONS[doc.type]}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium text-slate-800">
-                        {doc.name}
-                      </div>
-                      <div className="text-xs text-slate-400">
-                        {doc.size} · {formatDate(doc.uploadDate)}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="shrink-0 text-xs font-medium text-blue-600 hover:underline"
-                    >
-                      View
-                    </button>
-                  </div>
+                  <DocumentCard key={doc.id} doc={doc} />
                 ))}
               </div>
             ) : (
@@ -380,6 +378,8 @@ export default function TenantProfilePage({
               </p>
             )}
           </div>
+
+          <RentHistoryCard tenant={tenant} />
         </div>
       </div>
 
@@ -387,6 +387,12 @@ export default function TenantProfilePage({
         open={showRentDialog}
         onOpenChange={setShowRentDialog}
         defaultTenantId={tenant.id}
+      />
+
+      <EditTenantDialog
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+        tenant={tenant}
       />
     </div>
   );

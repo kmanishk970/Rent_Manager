@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, ReceiptText } from "lucide-react";
+import { Eye, Pencil, Plus, ReceiptText, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { AddBillDialog } from "@/components/rent/add-bill-dialog";
 import { RecordPaymentDialog } from "@/components/rent/record-payment-dialog";
-import { useBills, usePayments } from "@/lib/queries";
+import { MonthDetailsDialog } from "@/components/rent/month-details-dialog";
+import { useBills, useDeleteBill, usePayments } from "@/lib/queries";
+import { apiErrorMessage } from "@/lib/api/http";
 import { Skeleton } from "@/components/ui/skeleton";
-import { inr, monthLabel } from "@/lib/format";
+import { inr, monthKey, monthLabel } from "@/lib/format";
 import { meterWorking, readingGapFor } from "@/lib/electricity";
 import {
   STATUS_LABEL,
@@ -69,34 +72,110 @@ function Operator({ children }: { children: string }) {
 function StatementRow({
   statement,
   bills,
+  onView,
   onEdit,
   onPay,
 }: {
   statement: MonthlyStatement;
   /** Every bill for the unit, so a broken reading chain can be spotted. */
   bills: RentBill[];
+  onView: () => void;
   onEdit: (bill: RentBill) => void;
   onPay: (month: string) => void;
 }) {
   const { rent, electricity, other, total, paid, opening, shortfall, credit } =
     statement;
   const gap = readingGapFor(bills, statement.bill);
+  const [confirming, setConfirming] = useState(false);
+  const deleteBill = useDeleteBill();
+
+  // Only the month in progress is editable. A closed month is what was
+  // actually billed and paid, and correcting one after the fact rewrites a
+  // figure the running balance has already carried forward.
+  const editable = statement.month === monthKey();
+
+  const remove = async () => {
+    try {
+      await deleteBill.mutateAsync(statement.bill.id);
+      toast.success(`${monthLabel(statement.month)} bill deleted`);
+    } catch (error) {
+      toast.error(apiErrorMessage(error, "Could not delete that bill"));
+      setConfirming(false);
+    }
+  };
 
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={() => onEdit(statement.bill)}
-          className="text-sm font-semibold text-slate-800 hover:text-blue-600 hover:underline"
-        >
+        <span className="text-sm font-semibold text-slate-800">
           {monthLabel(statement.month)}
-        </button>
-        <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_TONE[statement.status]}`}
-        >
-          {STATUS_LABEL[statement.status]}
         </span>
+
+        {confirming ? (
+          <div className="flex shrink-0 items-center gap-1.5">
+            {/* The ledger is built from bills, so removing one takes its
+                month off the record — including money already recorded
+                against it, which stays in the database and reappears if the
+                month is billed again. Worth saying before, not after. */}
+            <span className="text-xs text-slate-500">
+              {paid > 0
+                ? `Delete? ${inr(paid)} paid will be hidden`
+                : "Delete this bill?"}
+            </span>
+            <button
+              type="button"
+              onClick={remove}
+              disabled={deleteBill.isPending}
+              className="rounded-lg bg-red-50 px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
+            >
+              {deleteBill.isPending ? "Deleting…" : "Delete"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              className="rounded-lg px-2 py-1 text-xs font-medium text-slate-500 hover:text-slate-700"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="flex shrink-0 items-center gap-1">
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_TONE[statement.status]}`}
+            >
+              {STATUS_LABEL[statement.status]}
+            </span>
+            {editable && (
+              <button
+                type="button"
+                onClick={() => onEdit(statement.bill)}
+                aria-label={`Edit the ${monthLabel(statement.month)} bill`}
+                title="Edit this month's charges"
+                className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-white hover:text-blue-600"
+              >
+                <Pencil className="size-3.5" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onView}
+              aria-label={`View the ${monthLabel(statement.month)} statement`}
+              title="See this month in full"
+              className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-white hover:text-blue-600"
+            >
+              <Eye className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirming(true)}
+              aria-label={`Delete the ${monthLabel(statement.month)} bill`}
+              title="Delete this month's bill"
+              className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-white hover:text-red-600"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* rent + electricity ( + other ) = total, every figure named */}
@@ -192,6 +271,7 @@ export function RentHistoryCard({ tenant }: { tenant: Tenant }) {
   const [editing, setEditing] = useState<RentBill | undefined>();
   const [payOpen, setPayOpen] = useState(false);
   const [payMonth, setPayMonth] = useState<string | undefined>();
+  const [viewingMonth, setViewingMonth] = useState<string | undefined>();
 
   if (billsPending || paymentsPending) {
     return <Skeleton className="h-64 rounded-xl" />;
@@ -206,12 +286,10 @@ export function RentHistoryCard({ tenant }: { tenant: Tenant }) {
   );
   const summary = summarise(statements);
   const rows = newestFirst(statements);
+  const viewing = statements.find((s) => s.month === viewingMonth);
 
-  const openAdd = () => {
-    setEditing(undefined);
-    setBillOpen(true);
-  };
-
+  // Only ever opened on a month that exists: correcting a bill, never raising
+  // one. Raising happens with the payment that settles it.
   const openEdit = (bill: RentBill) => {
     setEditing(bill);
     setBillOpen(true);
@@ -223,11 +301,14 @@ export function RentHistoryCard({ tenant }: { tenant: Tenant }) {
         <h3 className="text-sm font-semibold text-slate-700">Rent History</h3>
         <button
           type="button"
-          onClick={openAdd}
-          className="flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100"
+          onClick={() => {
+            setPayMonth(undefined);
+            setPayOpen(true);
+          }}
+          className="flex items-center gap-1 rounded-lg bg-green-50 px-2.5 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-100"
         >
           <Plus className="size-3.5" />
-          Add Bill
+          Record Payment
         </button>
       </div>
 
@@ -239,10 +320,13 @@ export function RentHistoryCard({ tenant }: { tenant: Tenant }) {
           <p className="text-sm text-slate-500">Nothing billed yet.</p>
           <button
             type="button"
-            onClick={openAdd}
-            className="mt-2 text-sm font-medium text-blue-600 hover:underline"
+            onClick={() => {
+              setPayMonth(undefined);
+              setPayOpen(true);
+            }}
+            className="mt-2 text-sm font-medium text-green-700 hover:underline"
           >
-            Add the first bill →
+            Record the first payment →
           </button>
         </div>
       ) : (
@@ -299,6 +383,7 @@ export function RentHistoryCard({ tenant }: { tenant: Tenant }) {
                 key={statement.month}
                 statement={statement}
                 bills={unitBills}
+                onView={() => setViewingMonth(statement.month)}
                 onEdit={openEdit}
                 onPay={(month) => {
                   setPayMonth(month);
@@ -308,20 +393,9 @@ export function RentHistoryCard({ tenant }: { tenant: Tenant }) {
             ))}
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              setPayMonth(undefined);
-              setPayOpen(true);
-            }}
-            className="mt-3 w-full rounded-lg bg-green-50 px-3 py-2 text-xs font-medium text-green-700 transition-colors hover:bg-green-100"
-          >
-            Record Payment
-          </button>
-
           {/* Statuses are derived from payments rather than set by hand, so
               say where they come from instead of offering a status control. */}
-          <p className="mt-2 text-center text-[11px] text-slate-400">
+          <p className="mt-3 text-center text-[11px] text-slate-400">
             A month turns Paid once payments cover it.
           </p>
         </>
@@ -340,6 +414,15 @@ export function RentHistoryCard({ tenant }: { tenant: Tenant }) {
         defaultTenantId={tenant.id}
         defaultMonth={payMonth}
       />
+
+      {viewing && (
+        <MonthDetailsDialog
+          open={Boolean(viewing)}
+          onOpenChange={(next) => !next && setViewingMonth(undefined)}
+          statement={viewing}
+          tenantName={tenant.name}
+        />
+      )}
     </div>
   );
 }

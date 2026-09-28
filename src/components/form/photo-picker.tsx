@@ -8,8 +8,12 @@ import { formatBytes } from "@/lib/format";
 const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 const PHOTO_ACCEPT = ".jpg,.jpeg,.png,.webp";
 
-/** Smaller than the document limit — this is an avatar, not an attachment. */
-const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+/**
+ * What may be *picked*. A phone photo is several megabytes and is re-encoded
+ * to a fraction of that before it leaves the browser, so this only has to keep
+ * out the absurd; the API's own 5 MB ceiling applies to what arrives.
+ */
+const MAX_PHOTO_BYTES = 25 * 1024 * 1024;
 
 /** Why a photo was rejected, or null when it is fine. */
 export function photoRejectionReason(file: File): string | null {
@@ -17,7 +21,7 @@ export function photoRejectionReason(file: File): string | null {
     return "Choose a JPG, PNG or WEBP image";
   }
   if (file.size > MAX_PHOTO_BYTES) {
-    return `That image is ${formatBytes(file.size)} — the limit is 5 MB`;
+    return `That image is ${formatBytes(file.size)} — the limit is 25 MB`;
   }
   if (file.size === 0) return "That image is empty";
   return null;
@@ -34,15 +38,21 @@ export function PhotoPicker({
   file,
   currentUrl,
   error,
+  progress,
+  compressing,
   onPick,
   onClear,
   label = "Photo",
-  hint = "JPG, PNG or WEBP up to 5 MB",
+  hint = "JPG, PNG or WEBP — it is compressed before uploading.",
 }: {
   file: File | null;
   /** An already-stored photo, shown until a new one is picked. */
   currentUrl?: string;
   error?: string;
+  /** 0–100 while the image is going up, null when it is not. */
+  progress?: number | null;
+  /** True while the image is being re-encoded, before the upload starts. */
+  compressing?: boolean;
   onPick: (file: File | null, reason: string | null) => void;
   onClear: () => void;
   label?: string;
@@ -69,6 +79,7 @@ export function PhotoPicker({
   };
 
   const shown = preview ?? currentUrl ?? null;
+  const sending = compressing || (progress !== null && progress !== undefined);
 
   return (
     <div>
@@ -122,7 +133,7 @@ export function PhotoPicker({
             />
           </label>
 
-          {file && (
+          {file && !sending && (
             <button
               type="button"
               onClick={() => {
@@ -138,13 +149,33 @@ export function PhotoPicker({
           )}
         </div>
 
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           {file ? (
             <>
               <p className="truncate text-sm font-medium text-slate-700">
                 {file.name}
               </p>
-              <p className="text-xs text-slate-400">{formatBytes(file.size)}</p>
+              {sending ? (
+                <div
+                  role="progressbar"
+                  aria-label={`${compressing ? "Compressing" : "Uploading"} ${file.name}`}
+                  aria-valuenow={progress ?? undefined}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-200"
+                >
+                  <div
+                    className={`h-full rounded-full bg-blue-600 ${
+                      compressing
+                        ? "animate-pulse"
+                        : "transition-[width] duration-200"
+                    }`}
+                    style={{ width: compressing ? "100%" : `${progress}%` }}
+                  />
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400">{formatBytes(file.size)}</p>
+              )}
             </>
           ) : (
             <>

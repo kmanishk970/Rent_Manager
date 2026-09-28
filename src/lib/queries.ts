@@ -7,7 +7,7 @@ import {
   type UseQueryOptions,
 } from "@tanstack/react-query";
 import * as api from "@/lib/api";
-import type { AppNotification, OwnerProfile, Tenant } from "@/types";
+import type { AppNotification, Tenant } from "@/types";
 
 /** Centralised cache keys so invalidation never drifts from the queries. */
 export const qk = {
@@ -248,10 +248,33 @@ export function useDeleteBill() {
   });
 }
 
+export function useUpdateTenant() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.updateTenant,
+    onSuccess: (tenant) => {
+      qc.setQueryData(qk.tenant(tenant.id), tenant);
+      qc.invalidateQueries({ queryKey: qk.tenants });
+      // Rent and deposit live on the lease, so the unit's figures move with it.
+      qc.invalidateQueries({ queryKey: qk.units });
+    },
+  });
+}
+
 export function useCreateDocument() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: api.createDocument,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.documents });
+    },
+  });
+}
+
+export function useUpdateDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.updateDocument,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.documents });
     },
@@ -287,7 +310,7 @@ export function useMarkAllNotificationsRead() {
 export function useUpdateOwnerProfile() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (patch: Partial<OwnerProfile>) => api.updateOwnerProfile(patch),
+    mutationFn: (patch: api.OwnerProfilePatch) => api.updateOwnerProfile(patch),
     onSuccess: (next) => qc.setQueryData(qk.owner, next),
   });
 }

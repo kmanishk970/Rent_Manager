@@ -24,8 +24,13 @@ export default function TenantsPage() {
     defaultValue: "all",
     clearOnDefault: true,
   });
-  // /tenants?add=1 opens the wizard, so "Add Tenant" links elsewhere work.
+  // /tenants?add=1 opens the form, so "Add Tenant" links elsewhere work.
   const [addParam, setAddParam] = useQueryState("add", {
+    defaultValue: "",
+    clearOnDefault: true,
+  });
+  // …and &unit=<id> says which unit it is for, when the link came from one.
+  const [unitParam, setUnitParam] = useQueryState("unit", {
     defaultValue: "",
     clearOnDefault: true,
   });
@@ -76,6 +81,7 @@ export default function TenantsPage() {
   const closeAdd = (open: boolean) => {
     setShowAdd(open);
     if (!open && addParam) setAddParam("");
+    if (!open && unitParam) setUnitParam("");
   };
 
   return (
@@ -265,7 +271,11 @@ export default function TenantsPage() {
         )}
       </div>
 
-      <AddTenantDialog open={showAdd} onOpenChange={closeAdd} />
+      <AddTenantDialog
+        open={showAdd}
+        onOpenChange={closeAdd}
+        unitId={unitParam || undefined}
+      />
     </div>
   );
 }

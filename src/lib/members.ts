@@ -48,6 +48,15 @@ export interface MemberDraft {
 
 export type MemberErrors = Partial<Record<keyof MemberDraft, string>>;
 
+/**
+ * What a validated draft yields: who the person is.
+ *
+ * Their ids and their photo are deliberately absent — one is assigned by the
+ * server, the other arrives from an upload, and neither is something a form
+ * can produce by itself.
+ */
+export type MemberValues = Omit<HouseholdMember, "id" | "personId" | "photo">;
+
 export function emptyMember(): MemberDraft {
   return {
     name: "",
@@ -139,7 +148,7 @@ const memberSchema = z
     }
   })
   .transform((draft) => {
-    const member: Omit<HouseholdMember, "id"> = {
+    const member: MemberValues = {
       name: draft.name,
       relation: draft.relation,
     };
@@ -156,7 +165,7 @@ const memberSchema = z
   });
 
 export type MemberResult =
-  | { ok: true; value: Omit<HouseholdMember, "id"> }
+  | { ok: true; value: MemberValues }
   | { ok: false; errors: MemberErrors };
 
 export function validateMember(draft: MemberDraft): MemberResult {

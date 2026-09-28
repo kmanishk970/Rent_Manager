@@ -2,12 +2,19 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
-    // Seed data points at Unsplash. Real uploads will be served from the
-    // backend's storage host, which gets added here alongside it.
     remotePatterns: [
+      // Seed data still points at Unsplash.
       {
         protocol: "https",
         hostname: "images.unsplash.com",
+        pathname: "/**",
+      },
+      // Everything uploaded through /media/upload is served from here. The
+      // cloud name is part of the path, not the host, so one pattern covers
+      // whichever account the API is configured with.
+      {
+        protocol: "https",
+        hostname: "res.cloudinary.com",
         pathname: "/**",
       },
     ],

@@ -12,6 +12,7 @@ import { useDeleteUnit, useProperty, useTenants } from "@/lib/queries";
 import { inrK } from "@/lib/format";
 import { toast } from "sonner";
 import { apiErrorMessage } from "@/lib/api/http";
+import { tenantOfUnit } from "@/lib/tenancy";
 import {
   Dialog,
   DialogContent,
@@ -260,9 +261,7 @@ export default function PropertyDetailPage({
 
             <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
               {floor.units.map((unit) => {
-                const tenant = unit.tenantId
-                  ? tenants?.find((t) => t.id === unit.tenantId)
-                  : null;
+                const tenant = tenantOfUnit(tenants, unit.id);
 
                 return (
                   <div key={unit.id} className="group/unit relative">

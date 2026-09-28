@@ -164,6 +164,7 @@ interface ApiPerson {
   idKind: string | null;
   idNumber: string | null;
   photoKey: string | null;
+  photoUrl: string | null;
 }
 
 interface ApiOccupant {
@@ -230,6 +231,11 @@ interface ApiDocument {
   leaseId: string | null;
   personId: string | null;
   storageKey: string;
+  url: string | null;
+  resourceType: string | null;
+  backStorageKey: string | null;
+  backUrl: string | null;
+  backResourceType: string | null;
   originalName: string;
   mimeType: string;
   sizeBytes: string;
@@ -254,6 +260,7 @@ interface ApiOwner {
   company: string | null;
   address: string | null;
   photoKey: string | null;
+  photoUrl: string | null;
   plan: string;
   electricityRate: string;
 }
@@ -312,6 +319,7 @@ function toMember(occupant: ApiOccupant): HouseholdMember {
   const { person } = occupant;
   return {
     id: occupant.id,
+    personId: occupant.personId,
     name: person.fullName,
     relation: occupant.relation ? toRelation(occupant.relation) : "Other",
     relationNote: occupant.relationNote ?? undefined,
@@ -320,6 +328,7 @@ function toMember(occupant: ApiOccupant): HouseholdMember {
     occupation: person.occupation ?? undefined,
     idType: person.idKind ? ID_KIND_TO_LABEL[person.idKind] : undefined,
     idNumber: person.idNumber ?? undefined,
+    photo: person.photoUrl ?? undefined,
   };
 }
 
@@ -346,8 +355,9 @@ export function toTenant(lease: ApiLease): Tenant {
 
   return {
     id: lease.id,
+    personId: primary?.personId ?? "",
     name: person?.fullName ?? "Unnamed tenant",
-    photo: person?.photoKey ?? PLACEHOLDER_PHOTO,
+    photo: person?.photoUrl ?? PLACEHOLDER_PHOTO,
     phone: person?.phone ?? "",
     email: person?.email ?? "",
     address: person?.addressLine ?? "",
@@ -457,6 +467,7 @@ export function toDocument(
     type: DOC_KIND_TO_TYPE[doc.kind] ?? "other",
     name: doc.title,
     tenantId: doc.leaseId ?? undefined,
+    personId: doc.personId ?? undefined,
     tenantName,
     propertyId: doc.propertyId ?? undefined,
     propertyName,
@@ -464,8 +475,10 @@ export function toDocument(
     size: formatBytes(Number(doc.sizeBytes)),
     fileName: doc.originalName,
     mimeType: doc.mimeType,
-    // Downloads go through storage, which is not wired up yet.
-    previewUrl: undefined,
+    // The stored Cloudinary URL: it opens and downloads, and unlike the object
+    // URL this used to hold, it is still there after a reload.
+    previewUrl: doc.url ?? undefined,
+    backUrl: doc.backUrl ?? undefined,
   };
 }
 
@@ -486,7 +499,7 @@ export function toOwnerProfile(owner: ApiOwner): OwnerProfile {
     name: owner.name,
     email: owner.email,
     phone: owner.phone ?? "",
-    photo: owner.photoKey ?? PLACEHOLDER_PHOTO,
+    photo: owner.photoUrl ?? PLACEHOLDER_PHOTO,
     plan: owner.plan.charAt(0).toUpperCase() + owner.plan.slice(1),
     address: owner.address ?? "",
     company: owner.company ?? "",

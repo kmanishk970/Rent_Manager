@@ -8,7 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UploadDocumentDialog } from "@/components/documents/upload-document-dialog";
+import { DocumentThumb } from "@/components/documents/document-thumb";
 import { useDeleteDocument, useDocuments } from "@/lib/queries";
+import { downloadUrl } from "@/lib/api/media";
 import { formatDate } from "@/lib/format";
 import {
   ALL_DOCUMENTS_ICON,
@@ -168,12 +170,7 @@ export default function DocumentsPage() {
               className="group rounded-xl border border-slate-200 bg-white p-4 shadow-card transition-all hover:border-blue-200 hover:shadow-card-hover"
             >
               <div className="flex items-start gap-3">
-                <div
-                  aria-hidden
-                  className={`${DOCUMENT_ICON_BOX} size-10 rounded-xl text-xl transition-colors ${DOCUMENT_TYPE_TONES[doc.type]}`}
-                >
-                  {DOCUMENT_TYPE_ICONS[doc.type]}
-                </div>
+                <DocumentThumb doc={doc} size={40} />
 
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm leading-tight font-semibold text-slate-900">
@@ -224,7 +221,7 @@ export default function DocumentsPage() {
                   View
                 </a>
                 <a
-                  href={doc.previewUrl ?? undefined}
+                  href={doc.previewUrl ? downloadUrl(doc.previewUrl) : undefined}
                   download={doc.fileName ?? doc.name}
                   aria-disabled={!doc.previewUrl}
                   onClick={(e) => {

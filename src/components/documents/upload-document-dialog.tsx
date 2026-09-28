@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { textField } from "@/lib/validation";
 import { toast } from "sonner";
-import { FilePicker, formatBytes } from "@/components/documents/file-picker";
+import { FilePicker } from "@/components/documents/file-picker";
 import { Field } from "@/components/form/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCreateDocument, useTenants } from "@/lib/queries";
+import { useUpload } from "@/lib/use-upload";
 import { DOCUMENT_TYPE_LABELS } from "@/lib/documents";
 import type { DocumentType } from "@/types";
 
@@ -52,6 +53,8 @@ export function UploadDocumentDialog({
 }) {
   const createDocument = useCreateDocument();
   const { data: tenants } = useTenants();
+  const { upload, cancel, progress, compressing, uploading } =
+    useUpload("documents");
 
   // The file lives outside the form: react-hook-form would only carry a
   // FileList around, and the picker needs its own rejection message anyway.
@@ -76,6 +79,7 @@ export function UploadDocumentDialog({
   };
 
   const closeAndReset = () => {
+    cancel();
     reset();
     clearFile();
   };
@@ -88,17 +92,17 @@ export function UploadDocumentDialog({
 
     const tenant = tenants?.find((t) => t.id === values.tenantId);
 
+    // The file goes up first. If it does not arrive there is nothing to
+    // record, and useUpload has already said why.
+    const uploaded = await upload(file);
+    if (!uploaded) return;
+
     await createDocument.mutateAsync({
       name: values.name,
       type: values.type,
       tenantId: values.tenantId || undefined,
       propertyId: tenant?.propertyId,
-      fileName: file.name,
-      mimeType: file.type,
-      size: formatBytes(file.size),
-      // Lets the document be opened in this session. Storage is still the
-      // backend's job, so it does not outlive a reload.
-      previewUrl: URL.createObjectURL(file),
+      file: uploaded,
     });
 
     toast.success(`${values.name} attached`);
@@ -120,8 +124,8 @@ export function UploadDocumentDialog({
             Upload Document
           </DialogTitle>
           <DialogDescription>
-            Attach a file and file it against a tenant. It opens from the
-            documents list; permanent storage arrives with the backend.
+            Attach a file and file it against a tenant. It is stored with the
+            record and opens from the documents list.
           </DialogDescription>
         </DialogHeader>
 
@@ -193,6 +197,8 @@ export function UploadDocumentDialog({
           <FilePicker
             file={file}
             error={fileError}
+            progress={progress}
+            compressing={compressing}
             onPick={(picked, reason) => {
               setFile(picked);
               setFileError(reason ?? undefined);
@@ -214,8 +220,17 @@ export function UploadDocumentDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={createDocument.isPending}>
-              {createDocument.isPending ? "Saving…" : "Upload"}
+            <Button
+              type="submit"
+              disabled={compressing || uploading || createDocument.isPending}
+            >
+              {compressing
+                ? "Compressing…"
+                : uploading
+                ? `Uploading… ${progress ?? 0}%`
+                : createDocument.isPending
+                  ? "Saving…"
+                  : "Upload"}
             </Button>
           </DialogFooter>
         </form>

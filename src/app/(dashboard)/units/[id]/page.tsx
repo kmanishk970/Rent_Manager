@@ -3,13 +3,15 @@
 import { use } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronRight, FileText, Users } from "lucide-react";
+import { ChevronRight, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { HouseholdMembersCard } from "@/components/tenants/household-members-card";
+import { DocumentCard } from "@/components/documents/document-card";
 import { RentHistoryCard } from "@/components/rent/rent-history-card";
 import { useDocuments, useProperties, useTenants } from "@/lib/queries";
 import { formatDate, inr, tenancyYear } from "@/lib/format";
 import { householdSummary } from "@/lib/members";
+import { tenantOfUnit } from "@/lib/tenancy";
 import type { UnitStatus } from "@/types";
 
 const STATUS_PILL: Record<UnitStatus, string> = {
@@ -78,11 +80,16 @@ export default function UnitDetailPage({
   }
 
   const { unit, floor, property } = located;
-  const tenant = unit.tenantId
-    ? (tenants?.find((t) => t.id === unit.tenantId) ?? null)
-    : null;
+  const tenant = tenantOfUnit(tenants, unit.id);
+  // Filed against the tenancy: the lease itself, plus the primary tenant's own
+  // papers. A member's documents live on the member — see their View button in
+  // the household card — or the list reads as duplicates of one another.
   const tenantDocs = tenant
-    ? (documents ?? []).filter((d) => d.tenantId === tenant.id)
+    ? (documents ?? []).filter(
+        (d) =>
+          d.tenantId === tenant.id &&
+          (!d.personId || d.personId === tenant.personId),
+      )
     : [];
 
   // Counted from the lease start's anniversary, so a long tenancy shows the
@@ -265,7 +272,7 @@ export default function UnitDetailPage({
               </div>
               <p className="text-sm text-slate-500">No tenant assigned</p>
               <Link
-                href="/tenants?add=1"
+                href={`/tenants?add=1&unit=${unit.id}`}
                 className="mt-3 inline-block text-sm font-medium text-blue-600 hover:underline"
               >
                 Add Tenant →
@@ -284,28 +291,7 @@ export default function UnitDetailPage({
               </h3>
               <div className="space-y-2.5">
                 {tenantDocs.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="flex items-center gap-3 rounded-lg bg-slate-50 p-3"
-                  >
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue-100">
-                      <FileText className="size-4 text-blue-600" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium text-slate-800">
-                        {doc.name}
-                      </div>
-                      <div className="text-xs text-slate-400">
-                        {doc.size} · {formatDate(doc.uploadDate)}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="shrink-0 text-xs font-medium text-blue-600 hover:underline"
-                    >
-                      View
-                    </button>
-                  </div>
+                  <DocumentCard key={doc.id} doc={doc} />
                 ))}
               </div>
             </div>

@@ -39,10 +39,21 @@ function apiBaseUrl(): string {
   return `http://localhost:${API_PORT}/api/v1`;
 }
 
+/**
+ * Long enough for a sleeping server to wake.
+ *
+ * A free host stops the API after a spell of no traffic and starts it again on
+ * the next request, which takes the better part of a minute. Fifteen seconds
+ * was generous against a server already running and hopeless against one that
+ * is starting: the first visit of the morning would fail, and a working deploy
+ * would look broken.
+ */
+const REQUEST_TIMEOUT_MS = 60_000;
+
 export const http = axios.create({
   baseURL: apiBaseUrl(),
   headers: { "Content-Type": "application/json" },
-  timeout: 15_000,
+  timeout: REQUEST_TIMEOUT_MS,
 });
 
 http.interceptors.request.use((config) => {
@@ -132,7 +143,9 @@ export function apiErrorMessage(error: unknown, fallback = "Something went wrong
   if (Array.isArray(body?.message)) return body.message.join(". ");
   if (typeof body?.message === "string") return body.message;
 
-  if (error.code === "ECONNABORTED") return "The server took too long to respond";
+  if (error.code === "ECONNABORTED") {
+    return "The server took too long to respond. It may be waking up — try again.";
+  }
   if (!error.response) return "Cannot reach the server. Is the API running?";
 
   return fallback;

@@ -311,7 +311,85 @@ export default function RentPage() {
 
       {/* Ledger */}
       <div className="overflow-hidden rounded-xl border border-slate-200/70 bg-white shadow-card">
-        <div className="overflow-x-auto">
+        {/* Phones: one card per billed month.
+            Seven columns in a 390px screen puts the balance and the status —
+            the two figures anybody opens this page for — off the right edge. */}
+        <ul className="divide-y divide-slate-100 md:hidden">
+          {filtered.map(({ key, tenant, propertyName, statement }) => (
+            <li key={key}>
+              <Link
+                href={`/tenants/${tenant.id}`}
+                className="block p-4 transition-colors active:bg-slate-50"
+              >
+                <div className="flex items-start gap-3">
+                  <Image
+                    src={tenant.photo}
+                    alt=""
+                    width={40}
+                    height={40}
+                    className="size-10 shrink-0 rounded-lg bg-slate-100 object-cover"
+                    unoptimized
+                  />
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-slate-900">
+                          {tenant.name}
+                        </div>
+                        <div className="truncate text-xs text-slate-400">
+                          {monthLabel(statement.month)} · {propertyName}
+                        </div>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_TONE[statement.status]}`}
+                      >
+                        {STATUS_LABEL[statement.status]}
+                      </span>
+                    </div>
+
+                    {/* Charged, paid, and what it leaves — the three figures
+                        the desktop table spreads across four columns. */}
+                    <dl className="mt-2.5 grid grid-cols-3 gap-2 text-xs">
+                      <div>
+                        <dt className="text-slate-400">Charged</dt>
+                        <dd className="font-semibold text-slate-900">
+                          {inr(statement.total)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-slate-400">Paid</dt>
+                        <dd className="font-medium text-slate-700">
+                          {inr(statement.paid)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-slate-400">Balance</dt>
+                        <dd
+                          className={
+                            statement.shortfall > 0
+                              ? "font-semibold text-red-600"
+                              : statement.credit > 0
+                                ? "font-semibold text-green-700"
+                                : "text-slate-400"
+                          }
+                        >
+                          {statement.shortfall > 0
+                            ? `−${inr(statement.shortfall)}`
+                            : statement.credit > 0
+                              ? `+${inr(statement.credit)}`
+                              : "—"}
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">

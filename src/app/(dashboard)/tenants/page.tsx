@@ -135,7 +135,89 @@ export default function TenantsPage() {
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200/70 bg-white shadow-card">
-        <div className="overflow-x-auto">
+        {/* Phones: one card per tenant.
+            Six columns cannot be read on a 390px screen — three of them sit
+            off the edge, and sideways scrolling inside a card is something
+            people have to discover before they can use it. The same facts
+            stack instead, and the whole card is the link. */}
+        <ul className="divide-y divide-slate-100 md:hidden">
+          {filtered.map((tenant) => {
+            const { property, unit } = locate(tenant);
+            const left = daysUntil(tenant.leaseEnd);
+            const expiring = left <= EXPIRING_WINDOW_DAYS && left > 0;
+            const expired = left <= 0;
+
+            return (
+              <li key={tenant.id}>
+                <Link
+                  href={`/tenants/${tenant.id}`}
+                  className="flex gap-3 p-4 transition-colors active:bg-slate-50"
+                >
+                  <Image
+                    src={tenant.photo}
+                    alt=""
+                    width={44}
+                    height={44}
+                    className="size-11 shrink-0 rounded-lg bg-slate-100 object-cover"
+                    unoptimized
+                  />
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate text-sm font-semibold text-slate-900">
+                            {tenant.name}
+                          </span>
+                          {(tenant.members ?? []).length > 0 && (
+                            <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
+                              <Users className="size-3" aria-hidden />
+                              {tenant.members.length}
+                            </span>
+                          )}
+                        </div>
+                        {/* Unit first: the line truncates on a narrow
+                            screen, and losing which unit somebody rents is
+                            worse than losing the floor it is on. */}
+                        <div className="truncate text-xs text-slate-400">
+                          Unit {unit?.number} · {property?.name ?? "—"}
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 text-right">
+                        <div className="text-sm font-semibold text-slate-900">
+                          {inr(tenant.rentAmount)}
+                        </div>
+                        <div className="text-[11px] text-slate-400">/month</div>
+                      </div>
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                      <span className="text-slate-500">{tenant.phone}</span>
+                      <span
+                        className={
+                          expired
+                            ? "font-medium text-red-600"
+                            : expiring
+                              ? "font-medium text-amber-600"
+                              : "text-slate-400"
+                        }
+                      >
+                        {expired
+                          ? "Lease expired"
+                          : expiring
+                            ? `${left}d left`
+                            : `Ends ${formatDate(tenant.leaseEnd)}`}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">

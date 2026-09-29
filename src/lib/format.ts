@@ -6,14 +6,31 @@ export function inr(amount: number): string {
 }
 
 /**
- * ₹158K — always thousands, never promoted to Lakhs.
+ * A short rupee figure, for a tile or a chart axis.
  *
- * The design fixes the unit per slot rather than picking one by magnitude, so
- * a column of figures stays comparable at a glance. Every compact figure in the
- * app uses this except the dashboard's Monthly Rent tile.
+ * Indian scale rather than thousands all the way up: ₹17L reads at a glance
+ * where ₹1700K has to be counted. Below a thousand the exact figure is shown,
+ * because rounding ₹450 to "₹0K" reported money that exists as nothing at all
+ * — worse than being a few characters longer.
+ *
+ * One decimal only where it changes the answer: ₹9.2K, but ₹18K rather than
+ * ₹18.0K.
  */
 export function inrK(amount: number): string {
-  return `₹${Math.round(amount / 1_000)}K`;
+  const sign = amount < 0 ? "-" : "";
+  const n = Math.abs(amount);
+
+  if (n < 1_000) return `${sign}₹${Math.round(n)}`;
+
+  const scaled = (value: number, suffix: string) => {
+    const shown =
+      value < 10 ? value.toFixed(1).replace(/\.0$/, "") : String(Math.round(value));
+    return `${sign}₹${shown}${suffix}`;
+  };
+
+  if (n < 1_00_000) return scaled(n / 1_000, "K");
+  if (n < 1_00_00_000) return scaled(n / 1_00_000, "L");
+  return scaled(n / 1_00_00_000, "Cr");
 }
 
 /** ₹3.2L — always Lakhs. Used only by the dashboard's Monthly Rent tile. */

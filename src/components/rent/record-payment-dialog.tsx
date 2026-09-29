@@ -82,7 +82,28 @@ const schema = z
     transactionId: z.string().trim().max(40, "Transaction ID is too long"),
   })
   .superRefine((values, ctx) => {
-    if (values.billed || values.electricityMode !== "meter") return;
+    if (values.billed) return;
+
+    // A bill that charges nothing is not a bill. An empty rent box coerces to
+    // zero rather than failing — moneyField accepts "" at min 0 — so without
+    // this a distracted submit files ₹0 for the month, and the month then
+    // counts as billed and cannot be raised again from here.
+    const charged =
+      Number(values.rent || 0) +
+      (values.electricityMode === "meter"
+        ? Math.max(0, values.meterCurrent - values.meterPrevious) * values.unitRate
+        : Number(values.electricity || 0)) +
+      Number(values.otherCharges || 0);
+
+    if (charged <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["rent"],
+        message: "A month must charge something — enter the rent",
+      });
+    }
+
+    if (values.electricityMode !== "meter") return;
 
     // A meter counts up. A lower closing reading means a typo, or a meter that
     // was replaced — which is what the flat option is there for.

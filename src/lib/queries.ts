@@ -22,6 +22,7 @@ export const qk = {
   documents: ["documents"] as const,
   notifications: ["notifications"] as const,
   owner: ["owner"] as const,
+  dashboardTrend: (months: number) => ["dashboard", "trend", months] as const,
 };
 
 /* ------------------------------------------------------------------ */
@@ -79,6 +80,14 @@ export function useNotifications(
     queryKey: qk.notifications,
     queryFn: api.listNotifications,
     ...options,
+  });
+}
+
+/** The rent chart's series. Twelve months unless asked otherwise. */
+export function useDashboardTrend(months = 12) {
+  return useQuery({
+    queryKey: qk.dashboardTrend(months),
+    queryFn: () => api.getDashboardTrend(months),
   });
 }
 

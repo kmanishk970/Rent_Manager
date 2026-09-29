@@ -22,6 +22,7 @@ import {
   type ApiProperty,
   type ApiUnit,
 } from "./mappers";
+import { monthLabel } from "@/lib/format";
 import type {
   AppNotification,
   DocumentType,
@@ -690,6 +691,56 @@ export async function markNotificationRead(id: string): Promise<AppNotification[
 export async function markAllNotificationsRead(): Promise<AppNotification[]> {
   await http.patch("/notifications/read-all");
   return listNotifications();
+}
+
+/* ------------------------------------------------------------------ */
+/* Dashboard                                                           */
+/* ------------------------------------------------------------------ */
+
+/** One month of the rent chart. */
+export interface RentTrendPoint {
+  /** "2026-09", for keys and sorting. */
+  period: string;
+  /** "Sep" — what the axis shows. */
+  month: string;
+  billed: number;
+  collected: number;
+  /** What the month asked for and did not get. Never negative. */
+  pending: number;
+}
+
+interface ApiTrendRow {
+  period: string;
+  billed: string;
+  collected: string;
+}
+
+/**
+ * Billed against collected, month by month.
+ *
+ * The API walks a series of months rather than the bills, so a month with no
+ * activity comes back as a zero rather than being missing — a gap in the
+ * middle of a chart reads as lost data instead of a quiet month.
+ *
+ * Pending is derived here because the chart wants the shortfall, while the
+ * API reports the two figures it actually has. It floors at zero: a month
+ * paid in advance is not owed a negative amount.
+ */
+export async function getDashboardTrend(months = 12): Promise<RentTrendPoint[]> {
+  const rows = await get<ApiTrendRow[]>("/dashboard/trend", { months });
+
+  return rows.map((row) => {
+    const billed = Number(row.billed);
+    const collected = Number(row.collected);
+
+    return {
+      period: row.period,
+      month: monthLabel(row.period).split(" ")[0],
+      billed,
+      collected,
+      pending: Math.max(0, billed - collected),
+    };
+  });
 }
 
 /* ------------------------------------------------------------------ */

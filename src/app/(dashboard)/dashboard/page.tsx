@@ -25,8 +25,14 @@ import {
   LayoutGrid,
   XCircle,
 } from "lucide-react";
-import { occupancyChartData, rentChartData } from "@/lib/mock-data";
-import { useOwnerProfile, usePayments, useProperties } from "@/lib/queries";
+
+import type { RentTrendPoint } from "@/lib/api";
+import {
+  useDashboardTrend,
+  useOwnerProfile,
+  usePayments,
+  useProperties,
+} from "@/lib/queries";
 import { inr, inrK, inrL, monthLong } from "@/lib/format";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LiftCard } from "@/components/ui/lift-card";
@@ -78,6 +84,7 @@ export default function DashboardPage() {
   const { data: properties, isPending } = useProperties();
   const { data: payments } = usePayments();
   const { data: owner } = useOwnerProfile();
+  const { data: trend, isPending: trendPending } = useDashboardTrend(12);
   const { resolvedTheme } = useTheme();
 
   // Recharts takes colours as props, not classes, so the CSS theme layer
@@ -86,6 +93,30 @@ export default function DashboardPage() {
   const axisTick = isDark ? "rgba(226,232,240,0.55)" : "#94A3B8";
   const gridStroke = isDark ? "rgba(255,255,255,0.10)" : "#E2E8F0";
   const legendText = isDark ? "rgba(226,232,240,0.7)" : "#64748B";
+
+  // Occupancy is counted from the units themselves rather than asked for
+  // separately: the property tree is already loaded, and a second source for
+  // the same fact is a second thing that can disagree with the first.
+  const units = (properties ?? []).flatMap((property) =>
+    property.floors.flatMap((floor) => floor.units),
+  );
+  const occupancy = [
+    {
+      name: "Occupied",
+      value: units.filter((u) => u.status === "occupied").length,
+      color: "#16A34A",
+    },
+    {
+      name: "Vacant",
+      value: units.filter((u) => u.status === "vacant").length,
+      color: "#DC2626",
+    },
+    {
+      name: "Maintenance",
+      value: units.filter((u) => u.status === "maintenance").length,
+      color: "#D97706",
+    },
+  ].filter((slice) => slice.value > 0);
 
   if (isPending || !properties) {
     return (
@@ -207,9 +238,21 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {trendPending ? (
+            <Skeleton className="h-[220px] rounded-lg" />
+          ) : (trend ?? []).every((point: RentTrendPoint) => point.billed === 0) ? (
+            // Every month at zero is not a chart, it is a flat line along the
+            // axis that looks like a rendering fault. Say what is missing.
+            <div className="flex h-[220px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 text-center">
+              <p className="text-sm text-slate-500">Nothing billed yet.</p>
+              <p className="mt-1 text-xs text-slate-400">
+                Record a payment against a month and it will appear here.
+              </p>
+            </div>
+          ) : (
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart
-              data={rentChartData}
+              data={trend ?? []}
               margin={{ top: 5, right: 10, left: -20, bottom: 0 }}
             >
               <defs>
@@ -264,6 +307,7 @@ export default function DashboardPage() {
               />
             </AreaChart>
           </ResponsiveContainer>
+          )}
         </div>
 
         {/* Occupancy donut */}
@@ -280,7 +324,7 @@ export default function DashboardPage() {
           <ResponsiveContainer width="100%" height={180}>
             <PieChart>
               <Pie
-                data={occupancyChartData}
+                data={occupancy}
                 cx="50%"
                 cy="50%"
                 innerRadius={55}
@@ -288,7 +332,7 @@ export default function DashboardPage() {
                 paddingAngle={3}
                 dataKey="value"
               >
-                {occupancyChartData.map((entry) => (
+                {occupancy.map((entry) => (
                   <Cell key={entry.name} fill={entry.color} />
                 ))}
               </Pie>
